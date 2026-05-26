@@ -15,3 +15,8 @@ export const zIncidentStatusListFilter = z.enum(
 export const zIncidentStatusCreate = z.enum(
   CREATE_INCIDENT_STATUSES as unknown as [string, ...string[]],
 );
+
+/** Task statuses — matches Public API `VALID_TASK_STATUSES`. */
+export const TASK_STATUSES = ['draft', 'todo', 'wip', 'in_review', 'done', 'cancelled'] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+export const zTaskStatus = z.enum(TASK_STATUSES);

@@ -2,8 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
 import type { JsonObject } from '../types';
-
-const VALID_TASK_STATUSES = ['draft', 'todo', 'wip', 'in_review', 'done', 'cancelled'] as const;
+import { TASK_STATUSES, zTaskStatus } from '../incidentZod';
 
 export function registerCreateIncidentTask(server: McpServer) {
   server.registerTool(
@@ -19,10 +18,9 @@ export function registerCreateIncidentTask(server: McpServer) {
           .nullable()
           .optional()
           .describe('Optional task description or details'),
-        currentStatus: z
-          .enum(VALID_TASK_STATUSES)
+        currentStatus: zTaskStatus
           .optional()
-          .describe(`Task status (default: draft). Options: ${VALID_TASK_STATUSES.join(', ')}`),
+          .describe(`Task status (default: draft). Options: ${TASK_STATUSES.join(', ')}`),
         dueDate: z
           .string()
           .datetime()
