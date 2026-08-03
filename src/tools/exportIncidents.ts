@@ -10,19 +10,26 @@ export function registerExportIncidents(server: McpServer) {
         'Bulk export incidents to a spreadsheet file (CSV or Excel) saved locally. ' +
         'Supports many of the same filters as list_incidents (status, severity, tags, etc.). ' +
         'CSV supports UTF-8 or Shift-JIS encoding; Excel is always Unicode. ' +
-        'Returns the saved file path, byte size, and content type.',
+        'If format is omitted, it is inferred from outputPath (.xlsx → xlsx, otherwise csv). ' +
+        'Files are saved as incidents-YYYY-MM-DD.<ext> (same as Twinpower UI). ' +
+        'Existing files are never overwritten — duplicates become "incidents-YYYY-MM-DD (1).<ext>". ' +
+        'Returns the saved file path, byte size, content type, and resolved format.',
       inputSchema: z.object({
         outputPath: z
           .string()
           .min(1)
           .describe(
-            'Local file path to save the export to (e.g. "~/Downloads/incidents.csv"). ' +
-              'Use a .csv or .xlsx extension matching the chosen format.',
+            'Destination directory or a sample file path used to choose the directory and format ' +
+              '(e.g. "~/Downloads" or "~/Downloads/incidents.xlsx"). The actual filename is ' +
+              'incidents-YYYY-MM-DD.<ext>; if that file already exists, a " (n)" suffix is added.',
           ),
         format: z
           .enum(['csv', 'xlsx'])
           .optional()
-          .describe('File format. Default: csv.'),
+          .describe(
+            'File format. When omitted, inferred from outputPath (.xlsx → xlsx, else csv). ' +
+              'If set, must match a .csv/.xlsx extension when one is present.',
+          ),
         encoding: z
           .enum(['utf8', 'shiftjis'])
           .optional()
@@ -70,7 +77,12 @@ export function registerExportIncidents(server: McpServer) {
             {
               type: 'text' as const,
               text: JSON.stringify(
-                { savedTo: result.path, bytes: result.bytes, contentType: result.contentType },
+                {
+                  savedTo: result.path,
+                  bytes: result.bytes,
+                  contentType: result.contentType,
+                  format: result.format,
+                },
                 null,
                 2,
               ),
