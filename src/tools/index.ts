@@ -64,6 +64,7 @@ import { registerUpdateMember } from './updateMember';
 import { registerRemoveMember } from './removeMember';
 // Bulk incidents
 import { registerBulkDeleteIncidents } from './bulkDeleteIncidents';
+import { registerExportIncidents } from './exportIncidents';
 // Blast radius
 import { registerGetIncidentBlastRadius } from './getIncidentBlastRadius';
 // Services (CMDB)
@@ -72,6 +73,7 @@ import { registerGetService } from './getService';
 import { registerCreateService } from './createService';
 import { registerUpdateService } from './updateService';
 import { registerDeleteService } from './deleteService';
+import { registerUpdateServiceHealth } from './updateServiceHealth';
 // Risks
 import { registerListRisks } from './listRisks';
 import { registerGetRisk } from './getRisk';
@@ -154,6 +156,7 @@ export function registerTools(server: McpServer) {
   registerRemoveMember(server);
   // Bulk incidents
   registerBulkDeleteIncidents(server);
+  registerExportIncidents(server);
   // Blast radius
   registerGetIncidentBlastRadius(server);
   // Services (CMDB)
@@ -162,6 +165,7 @@ export function registerTools(server: McpServer) {
   registerCreateService(server);
   registerUpdateService(server);
   registerDeleteService(server);
+  registerUpdateServiceHealth(server);
   // Risks
   registerListRisks(server);
   registerGetRisk(server);

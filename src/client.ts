@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, resolve, isAbsolute } from 'node:path';
 import { loadConfig } from './configure';
 import type {
   JsonValue,
@@ -443,6 +446,12 @@ export const api = {
       method: 'DELETE',
     }),
 
+  updateServiceHealth: (serviceId: string, health: string) =>
+    apiRequest<{ id: string; operationalHealth: string }>(`/v1/services/${serviceId}/health`, {
+      method: 'PATCH',
+      body: JSON.stringify({ health }),
+    }),
+
   // Risks
   listRisks: (params?: URLSearchParams) =>
     apiRequest<Risk[]>(`/v1/risks${params ? `?${params.toString()}` : ''}`),
@@ -525,3 +534,84 @@ export const api = {
   getIncidentPhaseTelemetry: (incidentId: string) =>
     apiRequest<IncidentPhaseTelemetry>(`/v1/incidents/${incidentId}/phase-telemetry`),
 };
+
+// ---------------------------------------------------------------------------
+// Bulk incident export (INTE-160)
+//
+// The export endpoint returns a binary spreadsheet rather than JSON, so it
+// bypasses `apiRequest` (which assumes JSON) and writes the bytes to a local
+// file — the idiomatic result for a local stdio MCP server. Exports can be
+// large, so it uses a longer timeout than normal requests.
+// ---------------------------------------------------------------------------
+
+const EXPORT_TIMEOUT_MS = 120_000;
+
+export interface ExportIncidentsParams {
+  format?: 'csv' | 'xlsx';
+  encoding?: 'utf8' | 'shiftjis';
+  lang?: 'en' | 'ja';
+  hasNarrative?: boolean;
+  q?: string;
+  status?: string[];
+  severity?: Array<string | number>;
+  declareSource?: string[];
+  category?: string[];
+  tag?: string[];
+  serviceId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+function buildExportQuery(params: ExportIncidentsParams): URLSearchParams {
+  const qs = new URLSearchParams();
+  if (params.format) qs.set('format', params.format);
+  if (params.encoding) qs.set('encoding', params.encoding);
+  if (params.lang) qs.set('lang', params.lang);
+  if (params.hasNarrative) qs.set('hasNarrative', 'true');
+  if (params.q) qs.set('q', params.q);
+  if (params.serviceId) qs.set('serviceId', params.serviceId);
+  if (params.sortBy) qs.set('sortBy', params.sortBy);
+  if (params.sortDir) qs.set('sortDir', params.sortDir);
+  for (const s of params.status ?? []) qs.append('status', String(s));
+  for (const s of params.severity ?? []) qs.append('severity', String(s));
+  for (const s of params.declareSource ?? []) qs.append('declareSource', s);
+  for (const c of params.category ?? []) qs.append('category', c);
+  for (const t of params.tag ?? []) qs.append('tag', t);
+  return qs;
+}
+
+function resolveOutputPath(outputPath: string): string {
+  let p = outputPath;
+  if (p === '~' || p.startsWith('~/')) {
+    p = p === '~' ? homedir() : resolve(homedir(), p.slice(2));
+  }
+  return isAbsolute(p) ? p : resolve(process.cwd(), p);
+}
+
+export async function exportIncidentsToFile(
+  params: ExportIncidentsParams,
+  outputPath: string,
+): Promise<{ path: string; bytes: number; contentType: string }> {
+  const { apiUrl, apiToken } = getCredentials();
+  const qs = buildExportQuery(params);
+  const url = `${apiUrl}/v1/incidents/export?${qs.toString()}`;
+
+  const response = await fetchWithTimeout(
+    url,
+    { method: 'GET', headers: new Headers({ Authorization: `Bearer ${apiToken}` }) },
+    EXPORT_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`API error ${response.status} for /v1/incidents/export: ${body}`);
+  }
+
+  const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const resolved = resolveOutputPath(outputPath);
+  await mkdir(dirname(resolved), { recursive: true });
+  await writeFile(resolved, buffer);
+
+  return { path: resolved, bytes: buffer.length, contentType };
+}
