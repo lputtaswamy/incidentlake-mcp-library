@@ -8,7 +8,7 @@ export function registerExportIncidents(server: McpServer) {
     {
       description:
         'Bulk export incidents to a spreadsheet file (CSV or Excel) saved locally. ' +
-        'Accepts the same filters as list_incidents (status, severity, tag, category, etc.). ' +
+        'Supports many of the same filters as list_incidents (status, severity, tags, etc.). ' +
         'CSV supports UTF-8 or Shift-JIS encoding; Excel is always Unicode. ' +
         'Returns the saved file path, byte size, and content type.',
       inputSchema: z.object({
