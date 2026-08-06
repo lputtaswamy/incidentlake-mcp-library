@@ -13,9 +13,10 @@ export function registerUpdateService(server: McpServer) {
         name: z.string().min(1).optional().describe('Updated service name'),
         serviceType: z
           .enum(['internal', 'external', 'cloud'])
+          .nullable()
           .optional()
           .describe(
-            'Updated service type. Blocked with 409 if the change would invalidate existing dependencies (External/Cloud cannot depend on internal).',
+            'Updated service type (null to clear). Blocked with 409 if the change would invalidate existing dependencies (External/Cloud cannot depend on internal).',
           ),
         protectionLevel: z
           .number()
