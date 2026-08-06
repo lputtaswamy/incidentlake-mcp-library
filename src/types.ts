@@ -216,9 +216,10 @@ export interface Service {
   name: string;
   serviceType?: string | null;
   protectionLevel: number;
+  description?: string | null;
   lifecycleState: string;
+  operationalHealth?: string | null;
   tags: string[];
-  customerNames: string[];
   sla?: number | null;
   createdAt: string;
   updatedAt: string;

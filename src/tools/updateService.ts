@@ -11,6 +11,12 @@ export function registerUpdateService(server: McpServer) {
       inputSchema: z.object({
         serviceId: z.string().uuid().describe('The UUID of the service to update'),
         name: z.string().min(1).optional().describe('Updated service name'),
+        serviceType: z
+          .enum(['internal', 'external', 'cloud'])
+          .optional()
+          .describe(
+            'Updated service type. Blocked with 409 if the change would invalidate existing dependencies (External/Cloud cannot depend on internal).',
+          ),
         protectionLevel: z
           .number()
           .int()
@@ -18,33 +24,22 @@ export function registerUpdateService(server: McpServer) {
           .max(5)
           .optional()
           .describe('Updated protection level (1=highest, 5=lowest)'),
-        serviceType: z
-          .enum(['internal', 'external', 'cloud'])
+        description: z
+          .string()
           .nullable()
           .optional()
-          .describe('Updated service type (null to clear)'),
-        lifecycleState: z
-          .enum(['planning', 'operating', 'retired'])
-          .optional()
-          .describe('Updated lifecycle state'),
+          .describe('Updated free-text description (null or empty string to clear)'),
         tags: z.array(z.string()).optional().describe('Updated tags (replaces existing)'),
-        customerNames: z
-          .array(z.string())
-          .optional()
-          .describe('Updated customer names (replaces existing)'),
-        sla: z.number().nullable().optional().describe('Updated SLA target (null to clear)'),
       }),
     },
     async (input) => {
       try {
         const body: JsonObject = {};
         if (input.name !== undefined) body.name = input.name;
-        if (input.protectionLevel !== undefined) body.protectionLevel = input.protectionLevel;
         if (input.serviceType !== undefined) body.serviceType = input.serviceType;
-        if (input.lifecycleState !== undefined) body.lifecycleState = input.lifecycleState;
+        if (input.protectionLevel !== undefined) body.protectionLevel = input.protectionLevel;
+        if (input.description !== undefined) body.description = input.description;
         if (input.tags !== undefined) body.tags = input.tags;
-        if (input.customerNames !== undefined) body.customerNames = input.customerNames;
-        if (input.sla !== undefined) body.sla = input.sla;
         const data = await api.updateService(input.serviceId, body);
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
