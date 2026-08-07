@@ -1,3 +1,6 @@
+import { access, constants, mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { loadConfig } from './configure';
 import type {
   JsonValue,
@@ -443,6 +446,12 @@ export const api = {
       method: 'DELETE',
     }),
 
+  updateServiceHealth: (serviceId: string, health: string) =>
+    apiRequest<{ id: string; operationalHealth: string }>(`/v1/services/${serviceId}/health`, {
+      method: 'PATCH',
+      body: JSON.stringify({ health }),
+    }),
+
   // Risks
   listRisks: (params?: URLSearchParams) =>
     apiRequest<Risk[]>(`/v1/risks${params ? `?${params.toString()}` : ''}`),
@@ -525,3 +534,218 @@ export const api = {
   getIncidentPhaseTelemetry: (incidentId: string) =>
     apiRequest<IncidentPhaseTelemetry>(`/v1/incidents/${incidentId}/phase-telemetry`),
 };
+
+// ---------------------------------------------------------------------------
+// Bulk incident export (INTE-160)
+//
+// The export endpoint returns a binary spreadsheet rather than JSON, so it
+// bypasses `apiRequest` (which assumes JSON) and writes the bytes to a local
+// file — the idiomatic result for a local stdio MCP server. Exports can be
+// large, so it uses a longer timeout than normal requests.
+// ---------------------------------------------------------------------------
+
+const EXPORT_TIMEOUT_MS = 120_000;
+
+export interface ExportIncidentsParams {
+  format?: 'csv' | 'xlsx';
+  encoding?: 'utf8' | 'shiftjis';
+  lang?: 'en' | 'ja';
+  hasNarrative?: boolean;
+  q?: string;
+  status?: string[];
+  severity?: Array<string | number>;
+  declareSource?: string[];
+  category?: string[];
+  tag?: string[];
+  serviceId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+function buildExportQuery(params: ExportIncidentsParams): URLSearchParams {
+  const qs = new URLSearchParams();
+  if (params.format) qs.set('format', params.format);
+  if (params.encoding) qs.set('encoding', params.encoding);
+  if (params.lang) qs.set('lang', params.lang);
+  if (params.hasNarrative) qs.set('hasNarrative', 'true');
+  if (params.q) qs.set('q', params.q);
+  if (params.serviceId) qs.set('serviceId', params.serviceId);
+  if (params.sortBy) qs.set('sortBy', params.sortBy);
+  if (params.sortDir) qs.set('sortDir', params.sortDir);
+  for (const s of params.status ?? []) qs.append('status', String(s));
+  for (const s of params.severity ?? []) qs.append('severity', String(s));
+  for (const s of params.declareSource ?? []) qs.append('declareSource', s);
+  for (const c of params.category ?? []) qs.append('category', c);
+  for (const t of params.tag ?? []) qs.append('tag', t);
+  return qs;
+}
+
+function resolveOutputPath(outputPath: string): string {
+  let p = outputPath;
+  if (p === '~' || p.startsWith('~/')) {
+    p = p === '~' ? homedir() : resolve(homedir(), p.slice(2));
+  }
+  return isAbsolute(p) ? p : resolve(process.cwd(), p);
+}
+
+/**
+ * Directory where the export should be written.
+ * - `~/Downloads/` or `~/Downloads` → that directory
+ * - `~/Downloads/incidents.xlsx` → `~/Downloads` (file path → parent)
+ */
+export function resolveExportDirectory(outputPath: string): string {
+  const resolved = resolveOutputPath(outputPath);
+  if (resolved.endsWith('/') || resolved.endsWith('\\')) {
+    return resolved.replace(/[/\\]+$/, '') || resolved;
+  }
+  const name = basename(resolved);
+  // Treat as a file path when it has an extension (e.g. .csv / .xlsx) or looks like a file.
+  if (extname(name)) {
+    return dirname(resolved);
+  }
+  return resolved;
+}
+
+/** Infer format from a path like `incidents.xlsx` → `xlsx`. Returns null if unknown. */
+export function formatFromOutputPath(outputPath: string): 'csv' | 'xlsx' | null {
+  const base = outputPath.split(/[\\/]/).pop() ?? outputPath;
+  const lower = base.toLowerCase();
+  if (lower.endsWith('.xlsx')) return 'xlsx';
+  if (lower.endsWith('.csv')) return 'csv';
+  return null;
+}
+
+/**
+ * Resolve the export format so the API payload matches the saved file extension.
+ * - If `format` is omitted: infer from extension (default csv when unknown).
+ * - If `format` is set and the extension is .csv/.xlsx: require they match.
+ */
+export function resolveExportFormat(
+  outputPath: string,
+  format?: 'csv' | 'xlsx',
+): 'csv' | 'xlsx' {
+  const fromPath = formatFromOutputPath(outputPath);
+
+  if (format === undefined) {
+    return fromPath ?? 'csv';
+  }
+
+  if (fromPath !== null && fromPath !== format) {
+    throw new Error(
+      `outputPath extension (.${fromPath}) does not match format="${format}". ` +
+        `Use a .${format} path, or omit format to infer from the extension.`,
+    );
+  }
+
+  return format;
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await access(p, constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** `foo.csv` → `foo (1).csv` — mirrors browser download duplicate naming. */
+export function withNumericSuffix(filePath: string, n: number): string {
+  const dir = dirname(filePath);
+  const ext = extname(filePath);
+  const base = basename(filePath, ext);
+  return join(dir, `${base} (${n})${ext}`);
+}
+
+/**
+ * Never overwrite: if `desiredPath` exists, try `name (1).ext`, `name (2).ext`, ...
+ * Same collision behavior as browser downloads of Twinpower UI exports.
+ */
+export async function uniqueOutputPath(desiredPath: string): Promise<string> {
+  if (!(await pathExists(desiredPath))) return desiredPath;
+  for (let n = 1; n < 1000; n++) {
+    const candidate = withNumericSuffix(desiredPath, n);
+    if (!(await pathExists(candidate))) return candidate;
+  }
+  throw new Error(`Could not find a free filename near ${desiredPath}`);
+}
+
+function sanitizeFilename(name: string): string {
+  const sanitised = Array.from(name.trim())
+    .filter((ch) => ch.charCodeAt(0) > 31)
+    .join('')
+    .replace(/[\\/]/g, '_')
+    .trim();
+  return sanitised || 'incidents.csv';
+}
+
+/** Parse `Content-Disposition` the same way the Twinpower UI does. */
+export function parseFilenameFromDisposition(
+  disposition: string | null,
+  fallback: string,
+): string {
+  if (!disposition) return fallback;
+
+  let name: string | undefined;
+  const extended = /filename\*=(?:[^']*'[^']*')?([^;]+)/i.exec(disposition);
+  if (extended?.[1]) {
+    const raw = extended[1].trim().replace(/^["']|["']$/g, '');
+    try {
+      name = decodeURIComponent(raw);
+    } catch {
+      name = raw;
+    }
+  } else {
+    const basic = /filename="?([^";]+)"?/i.exec(disposition);
+    name = basic?.[1];
+  }
+  if (!name) return fallback;
+  return sanitizeFilename(name);
+}
+
+/** Match backend `buildExportFilename`: `incidents-2026-07-27.csv`. */
+export function buildDatedExportFilename(format: 'csv' | 'xlsx', date = new Date()): string {
+  return `incidents-${date.toISOString().slice(0, 10)}.${format}`;
+}
+
+export async function exportIncidentsToFile(
+  params: ExportIncidentsParams,
+  outputPath: string,
+): Promise<{ path: string; bytes: number; contentType: string; format: 'csv' | 'xlsx' }> {
+  const format = resolveExportFormat(outputPath, params.format);
+  const { apiUrl, apiToken } = getCredentials();
+  const qs = buildExportQuery({ ...params, format });
+  const url = `${apiUrl}/v1/incidents/export?${qs.toString()}`;
+
+  const response = await fetchWithTimeout(
+    url,
+    { method: 'GET', headers: new Headers({ Authorization: `Bearer ${apiToken}` }) },
+    EXPORT_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`API error ${response.status} for /v1/incidents/export: ${body}`);
+  }
+
+  const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  const dir = resolveExportDirectory(outputPath);
+  await mkdir(dir, { recursive: true });
+
+  // Prefer the API's dated filename (incidents-YYYY-MM-DD.ext), same as Twinpower UI.
+  const fallbackName = buildDatedExportFilename(format);
+  const preferredName = parseFilenameFromDisposition(
+    response.headers.get('content-disposition'),
+    fallbackName,
+  );
+  // Keep extension aligned with the resolved format even if disposition is odd.
+  const baseName = preferredName.replace(/\.(csv|xlsx)$/i, '') + `.${format}`;
+  const desiredPath = join(dir, baseName);
+  const finalPath = await uniqueOutputPath(desiredPath);
+
+  await writeFile(finalPath, buffer);
+
+  return { path: finalPath, bytes: buffer.length, contentType, format };
+}
