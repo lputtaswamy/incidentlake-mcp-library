@@ -166,6 +166,28 @@ export interface RelatedResource {
   createdAt: string;
 }
 
+export type ZabbixSeverityLabel =
+  | 'Not classified'
+  | 'Information'
+  | 'Warning'
+  | 'Average'
+  | 'High'
+  | 'Disaster';
+
+export interface ZabbixProblem {
+  eventId: string;
+  triggerId: string;
+  name: string;
+  /** Zabbix's raw 0-5 severity (0=Not classified ... 5=Disaster). */
+  severity: number;
+  severityLabel: ZabbixSeverityLabel;
+  occurredAt: string;
+  acknowledged: boolean;
+  hostId?: string;
+  hostName?: string;
+  tags: { tag: string; value?: string }[];
+}
+
 export interface ReportDraft {
   id: string;
   incidentId: string;

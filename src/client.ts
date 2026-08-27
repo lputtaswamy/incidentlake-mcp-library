@@ -30,6 +30,7 @@ import type {
   PhaseEdge,
   PhaseCapture,
   IncidentPhaseTelemetry,
+  ZabbixProblem,
 } from './types';
 
 function unwrapDataPayload<T>(json: JsonValue): T {
@@ -524,4 +525,16 @@ export const api = {
 
   getIncidentPhaseTelemetry: (incidentId: string) =>
     apiRequest<IncidentPhaseTelemetry>(`/v1/incidents/${incidentId}/phase-telemetry`),
+
+  // Zabbix
+  searchZabbixProblems: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<ZabbixProblem[]>(`/v1/integrations/zabbix/problems${qs}`);
+  },
+
+  addZabbixRelatedResource: (incidentId: string, body: JsonObject) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/zabbix`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
