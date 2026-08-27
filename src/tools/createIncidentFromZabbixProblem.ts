@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
 import { optionalNonEmptyStringArraySchema } from '../coerceArrays';
-import type { JsonObject } from '../types';
+import type { JsonObject, IncidentDetail } from '../types';
 
 const inputSchema = z.object({
   eventId: z.string().min(1).describe("Zabbix problem's eventid (from search_zabbix_problems)"),
@@ -18,7 +18,11 @@ const inputSchema = z.object({
     .min(1)
     .max(5)
     .optional()
-    .describe('Severity level where 1=critical/highest and 5=lowest'),
+    .describe(
+      'Incident Lake severity where 1=critical/highest and 5=lowest — NOT Zabbix severity ' +
+        '(Zabbix uses 0-5 where 5=Disaster/highest). If mapping from a search_zabbix_problems ' +
+        'result, invert it (e.g. Zabbix 5/Disaster -> 1, Zabbix 4/High -> 2) rather than passing through.',
+    ),
   tags: optionalNonEmptyStringArraySchema.describe(
     'Categorization tags (e.g. client:acme, urgency:high); array or comma-separated string.',
   ),
@@ -38,7 +42,7 @@ export function registerCreateIncidentFromZabbixProblem(server: McpServer) {
       if (input.severity) incidentBody.severity = input.severity;
       if (input.tags?.length) incidentBody.tags = input.tags;
 
-      let incident;
+      let incident: IncidentDetail;
       try {
         incident = await api.createIncident(incidentBody);
       } catch (error) {
@@ -67,7 +71,7 @@ export function registerCreateIncidentFromZabbixProblem(server: McpServer) {
               type: 'text' as const,
               text:
                 `Incident ${incident.id} was created, but linking the Zabbix problem failed: ${errorMessage}. ` +
-                `Retry with add_zabbix_related_resource using incidentId=${incident.id}.`,
+                `Retry with add_zabbix_related_resource using incidentId=${incident.id}, eventId=${input.eventId}, triggerId=${input.triggerId}.`,
             },
           ],
           isError: true,
