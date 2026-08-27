@@ -1,0 +1,78 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { api } from '../client';
+import { optionalNonEmptyStringArraySchema } from '../coerceArrays';
+import type { JsonObject } from '../types';
+
+const inputSchema = z.object({
+  eventId: z.string().min(1).describe("Zabbix problem's eventid (from search_zabbix_problems)"),
+  triggerId: z
+    .string()
+    .min(1)
+    .describe("Zabbix problem's objectid / trigger id (from search_zabbix_problems)"),
+  name: z.string().min(1).max(255).describe('Incident name (e.g. the Zabbix problem name)'),
+  summary: z.string().max(5000).optional().describe('Optional initial summary of the incident'),
+  severity: z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .optional()
+    .describe('Severity level where 1=critical/highest and 5=lowest'),
+  tags: optionalNonEmptyStringArraySchema.describe(
+    'Categorization tags (e.g. client:acme, urgency:high); array or comma-separated string.',
+  ),
+});
+
+export function registerCreateIncidentFromZabbixProblem(server: McpServer) {
+  server.registerTool(
+    'create_incident_from_zabbix_problem',
+    {
+      description:
+        'Create a new incident and link a Zabbix problem to it in one step. Convenience wrapper around create_incident + add_zabbix_related_resource — use this when a user wants to turn a Zabbix alert (from search_zabbix_problems) directly into a tracked incident.',
+      inputSchema,
+    },
+    async (input) => {
+      const incidentBody: JsonObject = { name: input.name };
+      if (input.summary) incidentBody.summary = input.summary;
+      if (input.severity) incidentBody.severity = input.severity;
+      if (input.tags?.length) incidentBody.tags = input.tags;
+
+      let incident;
+      try {
+        incident = await api.createIncident(incidentBody);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        return {
+          content: [{ type: 'text' as const, text: `Error creating incident: ${errorMessage}` }],
+          isError: true,
+        };
+      }
+
+      try {
+        const linkBody: JsonObject = {
+          eventId: input.eventId,
+          triggerId: input.triggerId,
+          name: input.name,
+        };
+        const relatedResource = await api.addZabbixRelatedResource(incident.id, linkBody);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ incident, relatedResource }, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                `Incident ${incident.id} was created, but linking the Zabbix problem failed: ${errorMessage}. ` +
+                `Retry with add_zabbix_related_resource using incidentId=${incident.id}.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
