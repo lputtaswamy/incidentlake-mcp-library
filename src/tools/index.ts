@@ -82,6 +82,10 @@ import { registerUpdateRisk } from './updateRisk';
 import { registerLinkRiskToIncident } from './linkRiskToIncident';
 // Integrations
 import { registerListIntegrations } from './listIntegrations';
+// Zabbix
+import { registerSearchZabbixProblems } from './searchZabbixProblems';
+import { registerAddZabbixRelatedResource } from './addZabbixRelatedResource';
+import { registerCreateIncidentFromZabbixProblem } from './createIncidentFromZabbixProblem';
 // RBAC tags
 import { registerListRbacTags } from './listRbacTags';
 // Response Timeline
@@ -174,6 +178,10 @@ export function registerTools(server: McpServer) {
   registerLinkRiskToIncident(server);
   // Integrations
   registerListIntegrations(server);
+  // Zabbix
+  registerSearchZabbixProblems(server);
+  registerAddZabbixRelatedResource(server);
+  registerCreateIncidentFromZabbixProblem(server);
   // RBAC tags
   registerListRbacTags(server);
   // Response Timeline
