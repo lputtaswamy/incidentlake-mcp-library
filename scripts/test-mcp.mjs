@@ -172,6 +172,7 @@ async function main() {
     'create_incident_phase_capture', 'delete_incident_phase_capture',
     'get_incident_phase_telemetry',
     'search_zabbix_problems', 'add_zabbix_related_resource', 'create_incident_from_zabbix_problem',
+    'search_instana_events', 'add_instana_related_resource', 'create_incident_from_instana_event',
   ];
 
   await test('tools/list — all expected tools present', async () => {
@@ -563,6 +564,82 @@ async function main() {
   } else {
     skip('add_zabbix_related_resource', 'create_incident_from_zabbix_problem did not create an incident');
     skip('delete_incident (cleanup, zabbix incident)', 'create_incident_from_zabbix_problem did not create an incident');
+  }
+
+  // ── Instana ────────────────────────────────────────────────────────────────
+  console.log(bold('\nInstana'));
+
+  function isInstanaNotConfigured(err) {
+    return /instana integration not configured/i.test(err.message);
+  }
+
+  await test('search_instana_events', async () => {
+    try {
+      const data = parseContent(await callTool(mcpProcess, 'search_instana_events', { query: 'test' }));
+      if (!Array.isArray(data)) throw new Error('Expected array of Instana events');
+      return data;
+    } catch (err) {
+      if (isInstanaNotConfigured(err)) {
+        console.log(yellow('    (Instana not configured for this tenant — treating as pass)'));
+        return { notConfigured: true };
+      }
+      throw err;
+    }
+  });
+
+  let instanaIncidentId = null;
+
+  await test('create_incident_from_instana_event', async () => {
+    try {
+      const data = parseContent(await callTool(mcpProcess, 'create_incident_from_instana_event', {
+        eventId: 'mcp-test-event-999999',
+        name: '[MCP Test] Incident from Instana event',
+        summary: 'Created by scripts/test-mcp.mjs — safe to delete',
+        severity: 4,
+      }));
+      if (!data?.incident?.id) throw new Error('No incident.id in response');
+      instanaIncidentId = data.incident.id;
+      return data;
+    } catch (err) {
+      // Even a "not configured" failure creates the incident before the link fails —
+      // recover its id from the tool's error message so cleanup still runs below.
+      const match = err.message.match(/Incident ([0-9a-f-]{36}) was created/i);
+      if (match) instanaIncidentId = match[1];
+      if (isInstanaNotConfigured(err)) {
+        console.log(yellow('    (Instana not configured for this tenant — treating as pass)'));
+        return { notConfigured: true };
+      }
+      throw err;
+    }
+  });
+
+  if (instanaIncidentId) {
+    await test('add_instana_related_resource', async () => {
+      try {
+        const data = parseContent(await callTool(mcpProcess, 'add_instana_related_resource', {
+          incidentId: instanaIncidentId,
+          eventId: 'mcp-test-event-777777',
+          name: '[MCP Test] Second Instana event',
+        }));
+        if (!data.id) throw new Error('No id in response');
+        return data;
+      } catch (err) {
+        if (isInstanaNotConfigured(err)) {
+          console.log(yellow('    (Instana not configured for this tenant — treating as pass)'));
+          return { notConfigured: true };
+        }
+        throw err;
+      }
+    });
+
+    await test('delete_incident (cleanup, instana incident)', async () => {
+      const data = parseContent(await callTool(mcpProcess, 'delete_incident', { incidentId: instanaIncidentId }));
+      if (!data.deleted) throw new Error('Expected deleted=true');
+      return data;
+    });
+  } else {
+    skip('add_instana_related_resource', 'create_incident_from_instana_event did not create an incident');
+    skip('delete_incident (cleanup, instana incident)', 'create_incident_from_instana_event did not create an incident');
   }
 
   // ── Knowledge lifecycle ────────────────────────────────────────────────────

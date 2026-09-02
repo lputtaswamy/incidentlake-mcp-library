@@ -86,6 +86,10 @@ import { registerListIntegrations } from './listIntegrations';
 import { registerSearchZabbixProblems } from './searchZabbixProblems';
 import { registerAddZabbixRelatedResource } from './addZabbixRelatedResource';
 import { registerCreateIncidentFromZabbixProblem } from './createIncidentFromZabbixProblem';
+// Instana
+import { registerSearchInstanaEvents } from './searchInstanaEvents';
+import { registerAddInstanaRelatedResource } from './addInstanaRelatedResource';
+import { registerCreateIncidentFromInstanaEvent } from './createIncidentFromInstanaEvent';
 // RBAC tags
 import { registerListRbacTags } from './listRbacTags';
 // Response Timeline
@@ -182,6 +186,10 @@ export function registerTools(server: McpServer) {
   registerSearchZabbixProblems(server);
   registerAddZabbixRelatedResource(server);
   registerCreateIncidentFromZabbixProblem(server);
+  // Instana
+  registerSearchInstanaEvents(server);
+  registerAddInstanaRelatedResource(server);
+  registerCreateIncidentFromInstanaEvent(server);
   // RBAC tags
   registerListRbacTags(server);
   // Response Timeline
