@@ -188,6 +188,19 @@ export interface ZabbixProblem {
   tags: { tag: string; value?: string }[];
 }
 
+export type InstanaSeverityLabel = 'Change' | 'Warning' | 'Critical';
+
+export interface InstanaEvent {
+  eventId: string;
+  name: string;
+  /** Instana's raw severity (-1/absent=Change, 5=Warning, 10=Critical). */
+  severity: number;
+  severityLabel: InstanaSeverityLabel;
+  occurredAt: string;
+  entityId?: string;
+  entityName?: string;
+}
+
 export interface ReportDraft {
   id: string;
   incidentId: string;

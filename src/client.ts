@@ -34,6 +34,7 @@ import type {
   PhaseCapture,
   IncidentPhaseTelemetry,
   ZabbixProblem,
+  InstanaEvent,
 } from './types';
 
 function unwrapDataPayload<T>(json: JsonValue): T {
@@ -543,6 +544,18 @@ export const api = {
 
   addZabbixRelatedResource: (incidentId: string, body: JsonObject) =>
     apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/zabbix`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Instana
+  searchInstanaEvents: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<InstanaEvent[]>(`/v1/integrations/instana/events${qs}`);
+  },
+
+  addInstanaRelatedResource: (incidentId: string, body: JsonObject) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/instana`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
