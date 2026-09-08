@@ -7,7 +7,8 @@ export function registerListReportDrafts(server: McpServer) {
     'list_report_drafts',
     {
       description:
-        'List report drafts for an incident (newest first per type). Optionally filter by draft type: summary, timeline, or postmortem.',
+        'List report drafts for an incident (newest first per type). Optionally filter by draft type: summary, timeline, or postmortem. ' +
+        'To PUBLISH a draft, use the publish_report tool (it defaults to the latest draft of the given type).',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
         draftType: z

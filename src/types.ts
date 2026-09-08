@@ -24,6 +24,7 @@ export interface Incident {
   status: IncidentStatus;
   severity?: number;
   declareSource?: 'api' | 'slack' | 'manual';
+  createdBy?: string | null;
   occurredAt?: string;
   detectedAt?: string;
   resolvedAt?: string;
@@ -96,6 +97,15 @@ export interface TenantMember {
   memberStatus: string;
 }
 
+/** The tenant/identity that the API token belongs to (GET /v1/me). */
+export interface CurrentTenant {
+  id: string;
+  name: string;
+  defaultLanguage?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /**
  * Knowledge article.
  */
@@ -166,41 +176,6 @@ export interface RelatedResource {
   createdAt: string;
 }
 
-export type ZabbixSeverityLabel =
-  | 'Not classified'
-  | 'Information'
-  | 'Warning'
-  | 'Average'
-  | 'High'
-  | 'Disaster';
-
-export interface ZabbixProblem {
-  eventId: string;
-  triggerId: string;
-  name: string;
-  /** Zabbix's raw 0-5 severity (0=Not classified ... 5=Disaster). */
-  severity: number;
-  severityLabel: ZabbixSeverityLabel;
-  occurredAt: string;
-  acknowledged: boolean;
-  hostId?: string;
-  hostName?: string;
-  tags: { tag: string; value?: string }[];
-}
-
-export type InstanaSeverityLabel = 'Change' | 'Warning' | 'Critical';
-
-export interface InstanaEvent {
-  eventId: string;
-  name: string;
-  /** Instana's raw severity (-1/absent=Change, 5=Warning, 10=Critical). */
-  severity: number;
-  severityLabel: InstanaSeverityLabel;
-  occurredAt: string;
-  entityId?: string;
-  entityName?: string;
-}
-
 export interface ReportDraft {
   id: string;
   incidentId: string;
@@ -251,10 +226,9 @@ export interface Service {
   name: string;
   serviceType?: string | null;
   protectionLevel: number;
-  description?: string | null;
   lifecycleState: string;
-  operationalHealth?: string | null;
   tags: string[];
+  customerNames: string[];
   sla?: number | null;
   createdAt: string;
   updatedAt: string;

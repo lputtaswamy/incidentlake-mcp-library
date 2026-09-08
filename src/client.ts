@@ -12,6 +12,7 @@ import type {
   SopCompletionsData,
   IncidentNote,
   TenantMember,
+  CurrentTenant,
   KnowledgeItem,
   KnowledgeTagWithCount,
   IncidentSeverity,
@@ -230,7 +231,24 @@ export const api = {
 
   listMembers: () => apiRequest<TenantMember[]>('/v1/members'),
 
+  getCurrentTenant: () => apiRequest<CurrentTenant>('/v1/me'),
+
   listKnowledgeItems: () => apiRequest<KnowledgeItem[]>('/v1/knowledge'),
+
+  listPendingKnowledgeDrafts: () =>
+    apiRequest<KnowledgeItem[]>('/v1/knowledge/pending-drafts'),
+
+  approveKnowledgeDraft: (knowledgeId: string) =>
+    apiRequest<KnowledgeItem>(`/v1/knowledge/${knowledgeId}/approve`, {
+      method: 'POST',
+      body: '{}',
+    }),
+
+  dismissKnowledgeDraft: (knowledgeId: string) =>
+    apiRequest<{ success: boolean; id: string }>(`/v1/knowledge/${knowledgeId}/dismiss`, {
+      method: 'POST',
+      body: '{}',
+    }),
 
   searchKnowledgeItems: (query: string, limit?: number) => {
     const q = `query=${encodeURIComponent(query)}${limit !== undefined ? `&limit=${limit}` : ''}`;

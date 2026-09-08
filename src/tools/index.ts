@@ -15,7 +15,11 @@ import { registerAddIncidentTags } from './addIncidentTags';
 import { registerReplaceIncidentTags } from './replaceIncidentTags';
 import { registerRemoveIncidentTags } from './removeIncidentTags';
 import { registerListMembers } from './listMembers';
+import { registerGetCurrentTenant } from './getCurrentTenant';
 import { registerListKnowledgeItems } from './listKnowledgeItems';
+import { registerListPendingKnowledgeDrafts } from './listPendingKnowledgeDrafts';
+import { registerApproveKnowledgeDraft } from './approveKnowledgeDraft';
+import { registerDismissKnowledgeDraft } from './dismissKnowledgeDraft';
 import { registerSearchKnowledgeItems } from './searchKnowledgeItems';
 import { registerListKnowledgeTags } from './listKnowledgeTags';
 import { registerGetKnowledgeItem } from './getKnowledgeItem';
@@ -54,6 +58,7 @@ import { registerDeleteRelatedResource } from './deleteRelatedResource';
 import { registerListReportDrafts } from './listReportDrafts';
 import { registerCreateReportDraft } from './createReportDraft';
 import { registerListPublishedReports } from './listPublishedReports';
+import { registerPublishReport } from './publishReport';
 // Scheduled workflows
 import { registerListScheduledWorkflows } from './listScheduledWorkflows';
 import { registerCreateScheduledWorkflow } from './createScheduledWorkflow';
@@ -153,12 +158,14 @@ export function registerTools(server: McpServer) {
   registerListReportDrafts(server);
   registerCreateReportDraft(server);
   registerListPublishedReports(server);
+  registerPublishReport(server);
   // Scheduled workflows
   registerListScheduledWorkflows(server);
   registerCreateScheduledWorkflow(server);
   registerCancelScheduledWorkflow(server);
   // Members
   registerListMembers(server);
+  registerGetCurrentTenant(server);
   registerGetMember(server);
   registerUpdateMember(server);
   registerRemoveMember(server);
@@ -212,4 +219,8 @@ export function registerTools(server: McpServer) {
   registerUpdateKnowledgeItem(server);
   registerDeleteKnowledgeItem(server);
   registerUpdateKnowledgeItemTags(server);
+  // AI knowledge drafts (postmortem → knowledge review workflow)
+  registerListPendingKnowledgeDrafts(server);
+  registerApproveKnowledgeDraft(server);
+  registerDismissKnowledgeDraft(server);
 }

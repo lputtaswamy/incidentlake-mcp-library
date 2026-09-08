@@ -8,7 +8,8 @@ export function registerCreateReportDraft(server: McpServer) {
     'create_report_draft',
     {
       description:
-        'Create a report draft for an incident. Used to save AI-generated or manual summaries, timelines, or postmortems before publishing.',
+        'Create a report draft for an incident. Used to save AI-generated or manual summaries, timelines, or postmortems before publishing. ' +
+        'To PUBLISH a draft, use the publish_report tool (it defaults to the latest draft of the given type).',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
         draftType: z

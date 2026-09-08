@@ -11,9 +11,20 @@ const inputSchema = z.object({
   status: zIncidentStatusPatch.optional().describe(
     'Incident status (same set as Public API PATCH: ongoing, resolved, stalled, cancelled)',
   ),
-  summary: z.string().optional().describe('Summary text'),
-  timeline: z.string().optional(),
-  postmortem: z.string().optional(),
+  summary: z
+    .string()
+    .optional()
+    .describe('Summary report content. Setting this PUBLISHES/COMPLETES the incident summary report.'),
+  timeline: z
+    .string()
+    .optional()
+    .describe('Timeline report content. Setting this PUBLISHES/COMPLETES the incident timeline report.'),
+  postmortem: z
+    .string()
+    .optional()
+    .describe(
+      'Postmortem report content. Setting this PUBLISHES/COMPLETES the postmortem report and generates a knowledge-base draft for admin review.',
+    ),
   occurredAt: z
     .string()
     .datetime()
@@ -65,7 +76,14 @@ export function registerUpdateIncident(server: McpServer) {
     'update_incident',
     {
       description:
-        'Update an incident via Public API (PATCH /v1/incidents/{id}). Send at least one field: name, status, summary, timeline, postmortem; timestamps occurredAt, detectedAt, responseStartedAt, temporaryResponseCompletedAt, permanentResponseCompletedAt (ISO 8601 strings, or null to clear); assigneeEmails (full commander list); rbacTagIds (replaces all RBAC tags, [] to clear — call list_rbac_tags first).',
+        'Update an incident via Public API (PATCH /v1/incidents/{id}). Send at least one field: ' +
+        'name, status, summary, timeline, postmortem; timestamps occurredAt, detectedAt, ' +
+        'responseStartedAt, temporaryResponseCompletedAt, permanentResponseCompletedAt (ISO 8601 ' +
+        'strings, or null to clear); assigneeEmails (full commander list); rbacTagIds (replaces all ' +
+        'RBAC tags, [] to clear — call list_rbac_tags first). ' +
+        'Note: setting summary, timeline, or postmortem PUBLISHES/COMPLETES that report as a side ' +
+        'effect (postmortem also generates a knowledge-base draft) — to publish a saved report draft, ' +
+        'prefer the publish_report tool.',
       inputSchema,
     },
     async (input: UpdateIncidentToolInput) => {
