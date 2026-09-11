@@ -108,8 +108,8 @@ async function fetchWithTimeout(
  * retry after an ambiguous failure (timeout, dropped connection) risks re-applying a
  * request whose effects can't be told apart from a fresh one server-side — e.g. a batch
  * that creates new rows, or an action that's recorded once per call. A response that
- * came back at all (any status, including 5xx) is unambiguous and is never retried
- * regardless of this setting; it only affects timeouts and network failures.
+ * 4xx errors other than 429 are never retried; 429/5xx responses and timeouts/network
+ * failures are retried up to maxRetries.
  */
 async function apiRequest<T>(
   path: string,
