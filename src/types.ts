@@ -307,6 +307,93 @@ export interface RbacTag {
   updatedAt: string;
 }
 
+/** A directed CMDB graph edge: parentServiceId depends on childServiceId. */
+export interface ServiceDependency {
+  id: number;
+  tenantId: string;
+  parentServiceId: string;
+  childServiceId: string | null;
+  childServiceName: string | null;
+  dependencyType: string | null;
+  confidenceScore: number | null;
+  evidenceSnippet: string | null;
+  sourceUrl: string | null;
+  lastDetected: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Result of POST /v1/services/graph/batch — maps each services.create tempId to its real id. */
+export interface CmdbGraphBatchResult {
+  createdServiceIds: Record<string, string>;
+}
+
+export interface CmdbGraphChangeSummary {
+  nodesAdded: JsonValue[];
+  nodesRemoved: JsonValue[];
+  nodesModified: JsonValue[];
+  edgesAdded: JsonValue[];
+  edgesRemoved: JsonValue[];
+  edgesModified: JsonValue[];
+}
+
+export interface CmdbGraphPendingChanges {
+  changeSummary: CmdbGraphChangeSummary;
+  hasChanges: boolean;
+}
+
+export interface RecordedGraphVersion {
+  id: string;
+  versionNumber: number;
+  name: string | null;
+  changeSummary: CmdbGraphChangeSummary;
+}
+
+export interface CmdbGraphChangeSummaryCounts {
+  nodesAdded: number;
+  nodesRemoved: number;
+  nodesModified: number;
+  edgesAdded: number;
+  edgesRemoved: number;
+  edgesModified: number;
+}
+
+export interface CmdbGraphVersionHistoryEntry {
+  id: string;
+  versionNumber: number;
+  name: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdByEmail: string | null;
+  createdByLabel: string | null;
+  changeSummaryCounts: CmdbGraphChangeSummaryCounts;
+  isCurrent: boolean;
+}
+
+export interface CmdbGraphVersionHistoryResult {
+  versions: CmdbGraphVersionHistoryEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  currentVersionNumber: number;
+}
+
+export interface CmdbGraphVersionDetail {
+  id: string;
+  versionNumber: number;
+  name: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdByEmail: string | null;
+  createdByLabel: string | null;
+  snapshot: JsonObject;
+  changeSummary: CmdbGraphChangeSummary;
+  isCurrent: boolean;
+}
+
 /** Response timeline graph node — a response phase (e.g. impact_scope, client_communication, or a custom phase). */
 export interface PhaseNode {
   id: string;

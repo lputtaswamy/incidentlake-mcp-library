@@ -35,6 +35,12 @@ import type {
   IncidentPhaseTelemetry,
   ZabbixProblem,
   InstanaEvent,
+  ServiceDependency,
+  CmdbGraphBatchResult,
+  CmdbGraphPendingChanges,
+  RecordedGraphVersion,
+  CmdbGraphVersionHistoryResult,
+  CmdbGraphVersionDetail,
 } from './types';
 
 function unwrapDataPayload<T>(json: JsonValue): T {
@@ -97,7 +103,19 @@ async function fetchWithTimeout(
   }
 }
 
-async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+/**
+ * @param maxRetries Overrides MAX_RETRIES. Pass 0 for a non-idempotent mutation where a
+ * retry after an ambiguous failure (timeout, dropped connection) risks re-applying a
+ * request whose effects can't be told apart from a fresh one server-side — e.g. a batch
+ * that creates new rows, or an action that's recorded once per call. A response that
+ * 4xx errors other than 429 are never retried; 429/5xx responses and timeouts/network
+ * failures are retried up to maxRetries.
+ */
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  maxRetries: number = MAX_RETRIES,
+): Promise<T> {
   const { apiUrl, apiToken } = getCredentials();
 
   const headers = new Headers(options.headers);
@@ -108,7 +126,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetchWithTimeout(url, { ...options, headers }, REQUEST_TIMEOUT_MS);
 
@@ -120,7 +138,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
         }
 
         // Retry 429 (rate limited) and 5xx (server errors)
-        if (attempt < MAX_RETRIES) {
+        if (attempt < maxRetries) {
           const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
           await sleep(delay);
           continue;
@@ -141,7 +159,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
         throw err;
       }
 
-      if (attempt < MAX_RETRIES) {
+      if (attempt < maxRetries) {
         const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
         await sleep(delay);
         continue;
@@ -453,6 +471,59 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ health }),
     }),
+
+  // Service dependencies (CMDB graph edges)
+  listServiceDependencies: (serviceId: string) =>
+    apiRequest<ServiceDependency[]>(`/v1/services/${serviceId}/dependencies`),
+
+  listServiceReverseDependencies: (serviceId: string) =>
+    apiRequest<ServiceDependency[]>(`/v1/services/${serviceId}/reverse-dependencies`),
+
+  listServiceDependencyEdges: () =>
+    apiRequest<ServiceDependency[]>('/v1/service-dependencies'),
+
+  upsertServiceDependency: (body: JsonObject) =>
+    apiRequest<ServiceDependency>('/v1/service-dependencies', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteServiceDependency: (dependencyId: number) =>
+    apiRequest<{ id: number; deleted: boolean }>(`/v1/service-dependencies/${dependencyId}`, {
+      method: 'DELETE',
+    }),
+
+  // CMDB graph batch apply + version history
+  //
+  // saveCmdbGraphBatch and publishCmdbGraphVersion are NOT retried on a timeout/network
+  // failure: each can leave the server having committed (a batch's service.create rows,
+  // a new graph version) while the client only sees an ambiguous failure, and retrying
+  // would resubmit the same creates/publish rather than a safe no-op. A prompt error
+  // response (including 5xx) still isn't retried either way — see apiRequest's maxRetries.
+  saveCmdbGraphBatch: (body: JsonObject) =>
+    apiRequest<CmdbGraphBatchResult>(
+      '/v1/services/graph/batch',
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+    ),
+
+  getCmdbGraphPendingChanges: () =>
+    apiRequest<CmdbGraphPendingChanges>('/v1/services/graph/pending-changes'),
+
+  publishCmdbGraphVersion: (body: JsonObject) =>
+    apiRequest<RecordedGraphVersion>(
+      '/v1/services/graph/publish',
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+    ),
+
+  listCmdbGraphVersions: (params?: URLSearchParams) =>
+    apiRequest<CmdbGraphVersionHistoryResult>(
+      `/v1/services/graph/versions${params ? `?${params.toString()}` : ''}`,
+    ),
+
+  getCmdbGraphVersionDetail: (versionNumber: number) =>
+    apiRequest<CmdbGraphVersionDetail>(`/v1/services/graph/versions/${versionNumber}`),
 
   // Risks
   listRisks: (params?: URLSearchParams) =>
