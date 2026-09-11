@@ -74,6 +74,18 @@ import { registerCreateService } from './createService';
 import { registerUpdateService } from './updateService';
 import { registerDeleteService } from './deleteService';
 import { registerUpdateServiceHealth } from './updateServiceHealth';
+// Service dependencies (CMDB graph edges)
+import { registerListServiceDependencies } from './listServiceDependencies';
+import { registerListServiceReverseDependencies } from './listServiceReverseDependencies';
+import { registerListServiceDependencyEdges } from './listServiceDependencyEdges';
+import { registerUpsertServiceDependency } from './upsertServiceDependency';
+import { registerDeleteServiceDependency } from './deleteServiceDependency';
+// CMDB graph batch apply + version history
+import { registerSaveCmdbGraphBatch } from './saveCmdbGraphBatch';
+import { registerGetCmdbGraphPendingChanges } from './getCmdbGraphPendingChanges';
+import { registerPublishCmdbGraphVersion } from './publishCmdbGraphVersion';
+import { registerListCmdbGraphVersions } from './listCmdbGraphVersions';
+import { registerGetCmdbGraphVersionDetail } from './getCmdbGraphVersionDetail';
 // Risks
 import { registerListRisks } from './listRisks';
 import { registerGetRisk } from './getRisk';
@@ -174,6 +186,18 @@ export function registerTools(server: McpServer) {
   registerUpdateService(server);
   registerDeleteService(server);
   registerUpdateServiceHealth(server);
+  // Service dependencies (CMDB graph edges)
+  registerListServiceDependencies(server);
+  registerListServiceReverseDependencies(server);
+  registerListServiceDependencyEdges(server);
+  registerUpsertServiceDependency(server);
+  registerDeleteServiceDependency(server);
+  // CMDB graph batch apply + version history
+  registerSaveCmdbGraphBatch(server);
+  registerGetCmdbGraphPendingChanges(server);
+  registerPublishCmdbGraphVersion(server);
+  registerListCmdbGraphVersions(server);
+  registerGetCmdbGraphVersionDetail(server);
   // Risks
   registerListRisks(server);
   registerGetRisk(server);

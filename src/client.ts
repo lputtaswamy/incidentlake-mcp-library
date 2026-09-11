@@ -35,6 +35,12 @@ import type {
   IncidentPhaseTelemetry,
   ZabbixProblem,
   InstanaEvent,
+  ServiceDependency,
+  CmdbGraphBatchResult,
+  CmdbGraphPendingChanges,
+  RecordedGraphVersion,
+  CmdbGraphVersionHistoryResult,
+  CmdbGraphVersionDetail,
 } from './types';
 
 function unwrapDataPayload<T>(json: JsonValue): T {
@@ -453,6 +459,51 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ health }),
     }),
+
+  // Service dependencies (CMDB graph edges)
+  listServiceDependencies: (serviceId: string) =>
+    apiRequest<ServiceDependency[]>(`/v1/services/${serviceId}/dependencies`),
+
+  listServiceReverseDependencies: (serviceId: string) =>
+    apiRequest<ServiceDependency[]>(`/v1/services/${serviceId}/reverse-dependencies`),
+
+  listServiceDependencyEdges: () =>
+    apiRequest<ServiceDependency[]>('/v1/service-dependencies'),
+
+  upsertServiceDependency: (body: JsonObject) =>
+    apiRequest<ServiceDependency>('/v1/service-dependencies', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteServiceDependency: (dependencyId: number) =>
+    apiRequest<{ id: number; deleted: boolean }>(`/v1/service-dependencies/${dependencyId}`, {
+      method: 'DELETE',
+    }),
+
+  // CMDB graph batch apply + version history
+  saveCmdbGraphBatch: (body: JsonObject) =>
+    apiRequest<CmdbGraphBatchResult>('/v1/services/graph/batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getCmdbGraphPendingChanges: () =>
+    apiRequest<CmdbGraphPendingChanges>('/v1/services/graph/pending-changes'),
+
+  publishCmdbGraphVersion: (body: JsonObject) =>
+    apiRequest<RecordedGraphVersion>('/v1/services/graph/publish', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  listCmdbGraphVersions: (params?: URLSearchParams) =>
+    apiRequest<CmdbGraphVersionHistoryResult>(
+      `/v1/services/graph/versions${params ? `?${params.toString()}` : ''}`,
+    ),
+
+  getCmdbGraphVersionDetail: (versionNumber: number) =>
+    apiRequest<CmdbGraphVersionDetail>(`/v1/services/graph/versions/${versionNumber}`),
 
   // Risks
   listRisks: (params?: URLSearchParams) =>
