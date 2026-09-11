@@ -49,6 +49,40 @@ const dependencyInputSchema = z.object({
   sourceUrl: z.string().optional(),
 });
 
+// Zod's .optional() fields are typed `T | undefined`, and `undefined` isn't a valid
+// JsonValue — so a parsed input object can't be assigned into a JsonObject directly.
+// These normalize each shape into a plain JsonObject, omitting any field the caller
+// didn't set rather than writing it through as `undefined`.
+
+function serviceCreateInputToBody(input: z.infer<typeof serviceCreateInputSchema>): JsonObject {
+  const body: JsonObject = { name: input.name };
+  if (input.serviceType !== undefined) body.serviceType = input.serviceType;
+  if (input.protectionLevel !== undefined) body.protectionLevel = input.protectionLevel;
+  if (input.description !== undefined) body.description = input.description;
+  if (input.tags !== undefined) body.tags = input.tags;
+  return body;
+}
+
+function serviceUpdateInputToBody(input: z.infer<typeof serviceUpdateInputSchema>): JsonObject {
+  const body: JsonObject = {};
+  if (input.name !== undefined) body.name = input.name;
+  if (input.serviceType !== undefined) body.serviceType = input.serviceType;
+  if (input.protectionLevel !== undefined) body.protectionLevel = input.protectionLevel;
+  if (input.description !== undefined) body.description = input.description;
+  if (input.tags !== undefined) body.tags = input.tags;
+  return body;
+}
+
+function dependencyInputToBody(input: z.infer<typeof dependencyInputSchema> | undefined): JsonObject {
+  const body: JsonObject = {};
+  if (!input) return body;
+  if (input.dependencyType !== undefined) body.dependencyType = input.dependencyType;
+  if (input.confidenceScore !== undefined) body.confidenceScore = input.confidenceScore;
+  if (input.evidenceSnippet !== undefined) body.evidenceSnippet = input.evidenceSnippet;
+  if (input.sourceUrl !== undefined) body.sourceUrl = input.sourceUrl;
+  return body;
+}
+
 export function registerSaveCmdbGraphBatch(server: McpServer) {
   server.registerTool(
     'save_cmdb_graph_batch',
@@ -109,15 +143,21 @@ export function registerSaveCmdbGraphBatch(server: McpServer) {
       try {
         const body: JsonObject = {
           services: {
-            create: input.services?.create ?? [],
-            update: input.services?.update ?? [],
+            create: (input.services?.create ?? []).map((c) => ({
+              tempId: c.tempId,
+              input: serviceCreateInputToBody(c.input),
+            })),
+            update: (input.services?.update ?? []).map((u) => ({
+              serviceId: u.serviceId,
+              input: serviceUpdateInputToBody(u.input),
+            })),
             delete: input.services?.delete ?? [],
           },
           dependencies: {
             upsert: (input.dependencies?.upsert ?? []).map((u) => ({
               parentServiceId: u.parentServiceId,
               childServiceId: u.childServiceId,
-              input: u.input ?? {},
+              input: dependencyInputToBody(u.input),
             })),
             delete: input.dependencies?.delete ?? [],
           },
