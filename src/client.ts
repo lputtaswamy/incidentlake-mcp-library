@@ -14,6 +14,11 @@ import type {
   TenantMember,
   KnowledgeItem,
   KnowledgeTagWithCount,
+  CurrentTenant,
+  PendingKnowledgeDraft,
+  ApprovedKnowledgeDraft,
+  JiraSearchHit,
+  NotionSearchHit,
   IncidentSeverity,
   IncidentSeveritiesData,
   IncidentTask,
@@ -171,6 +176,8 @@ async function apiRequest<T>(
 }
 
 export const api = {
+  getCurrentTenant: () => apiRequest<CurrentTenant>('/v1/me'),
+
   listIncidents: (params: URLSearchParams) =>
     apiRequest<PaginatedIncidents>(`/v1/incidents?${params.toString()}`),
 
@@ -279,6 +286,25 @@ export const api = {
       body: JSON.stringify({ tags }),
     }),
 
+  listPendingKnowledgeDrafts: () =>
+    apiRequest<PendingKnowledgeDraft[]>('/v1/knowledge/pending-drafts'),
+
+  // approveKnowledgeDraft and dismissKnowledgeDraft are NOT retried: each leaves the draft
+  // no longer pending, so a retry after a timeout surfaces as a 404 instead of the result.
+  approveKnowledgeDraft: (knowledgeId: string) =>
+    apiRequest<ApprovedKnowledgeDraft>(
+      `/v1/knowledge/${knowledgeId}/approve`,
+      { method: 'POST' },
+      0,
+    ),
+
+  dismissKnowledgeDraft: (knowledgeId: string) =>
+    apiRequest<{ success: boolean; id: string }>(
+      `/v1/knowledge/${knowledgeId}/dismiss`,
+      { method: 'POST' },
+      0,
+    ),
+
   // Severities
   listIncidentSeverities: (incidentId: string) =>
     apiRequest<IncidentSeveritiesData>(`/v1/incidents/${incidentId}/severities`),
@@ -386,6 +412,12 @@ export const api = {
       `/v1/incidents/${incidentId}/related-resources/${resourceId}`,
       { method: 'DELETE' },
     ),
+
+  addRelatedResourceByUrl: (incidentId: string, url: string) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/url`, {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
 
   // Reports
   listReportDrafts: (incidentId: string, draftType?: string) => {
@@ -630,6 +662,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  searchJiraIssues: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<JiraSearchHit[]>(`/v1/integrations/jira/issues${qs}`);
+  },
+
+  searchNotionPages: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<NotionSearchHit[]>(`/v1/integrations/notion/search${qs}`);
+  },
 };
 
 // ---------------------------------------------------------------------------
