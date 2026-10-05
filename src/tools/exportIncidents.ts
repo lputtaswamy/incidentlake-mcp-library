@@ -1,34 +1,45 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { exportIncidentsToFile, type ExportIncidentsParams } from '../client';
+import {
+  exportIncidentsToBytes,
+  exportIncidentsToFile,
+  type ExportIncidentsParams,
+} from '../client';
 
 export function registerExportIncidents(server: McpServer) {
   server.registerTool(
     'export_incidents',
     {
       description:
-        'Bulk export incidents to a spreadsheet file (CSV or Excel) saved locally. ' +
-        'Supports many of the same filters as list_incidents (status, severity, tags, etc.). ' +
-        'CSV supports UTF-8 or Shift-JIS encoding; Excel is always Unicode. ' +
-        'If format is omitted, it is inferred from outputPath (.xlsx → xlsx, otherwise csv). ' +
-        'Files are saved as incidents-YYYY-MM-DD.<ext> (same as Twinpower UI). ' +
-        'Existing files are never overwritten — duplicates become "incidents-YYYY-MM-DD (1).<ext>". ' +
-        'Returns the saved file path, byte size, content type, and resolved format.',
+        'Bulk export incidents to a spreadsheet (CSV or Excel). ' +
+        'Two modes: ' +
+        '(1) If outputPath is provided, the file is saved locally — intended for the stdio MCP ' +
+        'server running on the user\'s machine. Files are saved as incidents-YYYY-MM-DD.<ext>; ' +
+        'existing files become "incidents-YYYY-MM-DD (1).<ext>". ' +
+        '(2) If outputPath is omitted, the file bytes are returned inline as an MCP embedded ' +
+        'resource (base64) — intended for the remote hosted MCP server where the user\'s disk ' +
+        'is not reachable; the client (e.g. Claude.ai web UI) renders a download link. ' +
+        'Supports the same filters as list_incidents. ' +
+        'CSV supports UTF-8 or Shift-JIS encoding; Excel is always Unicode.',
       inputSchema: z.object({
         outputPath: z
           .string()
           .min(1)
+          .optional()
           .describe(
-            'Destination directory or a sample file path used to choose the directory and format ' +
-              '(e.g. "~/Downloads" or "~/Downloads/incidents.xlsx"). The actual filename is ' +
-              'incidents-YYYY-MM-DD.<ext>; if that file already exists, a " (n)" suffix is added.',
+            'Optional. When set, writes the export to this directory (or uses the path\'s ' +
+              'directory and extension), returning the saved file path. When omitted, the ' +
+              'export is returned inline as a base64 embedded resource for the client to ' +
+              'download — required for remote hosted MCP where the server cannot access the ' +
+              'user\'s disk.',
           ),
         format: z
           .enum(['csv', 'xlsx'])
           .optional()
           .describe(
-            'File format. When omitted, inferred from outputPath (.xlsx → xlsx, else csv). ' +
-              'If set, must match a .csv/.xlsx extension when one is present.',
+            'File format. When omitted, defaults to csv (or is inferred from outputPath when ' +
+              'that is set: .xlsx → xlsx, else csv). If both are set, must match any ' +
+              '.csv/.xlsx extension on outputPath.',
           ),
         encoding: z
           .enum(['utf8', 'shiftjis'])
@@ -71,21 +82,52 @@ export function registerExportIncidents(server: McpServer) {
     async (input) => {
       try {
         const { outputPath, ...params } = input;
-        const result = await exportIncidentsToFile(params as ExportIncidentsParams, outputPath);
+
+        if (outputPath) {
+          const result = await exportIncidentsToFile(params as ExportIncidentsParams, outputPath);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(
+                  {
+                    savedTo: result.path,
+                    bytes: result.bytes,
+                    contentType: result.contentType,
+                    format: result.format,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await exportIncidentsToBytes(params as ExportIncidentsParams);
         return {
           content: [
             {
               type: 'text' as const,
               text: JSON.stringify(
                 {
-                  savedTo: result.path,
-                  bytes: result.bytes,
+                  filename: result.filename,
+                  bytes: result.buffer.length,
                   contentType: result.contentType,
                   format: result.format,
+                  mode: 'inline',
                 },
                 null,
                 2,
               ),
+            },
+            {
+              type: 'resource' as const,
+              resource: {
+                uri: `incidentlake://exports/${result.filename}`,
+                mimeType: result.contentType,
+                blob: result.buffer.toString('base64'),
+              },
             },
           ],
         };

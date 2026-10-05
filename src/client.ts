@@ -876,11 +876,23 @@ export function buildDatedExportFilename(format: 'csv' | 'xlsx', date = new Date
   return `incidents-${date.toISOString().slice(0, 10)}.${format}`;
 }
 
-export async function exportIncidentsToFile(
+export interface ExportIncidentsBytes {
+  buffer: Buffer;
+  contentType: string;
+  format: 'csv' | 'xlsx';
+  filename: string;
+}
+
+/**
+ * Fetch the export bytes without touching the filesystem. Used by both the file-writing
+ * variant (local stdio) and the inline-download variant (remote hosted MCP, where the
+ * server has no access to the user's disk and must return the file as an embedded
+ * resource for the client to save).
+ */
+export async function exportIncidentsToBytes(
   params: ExportIncidentsParams,
-  outputPath: string,
-): Promise<{ path: string; bytes: number; contentType: string; format: 'csv' | 'xlsx' }> {
-  const format = resolveExportFormat(outputPath, params.format);
+): Promise<ExportIncidentsBytes> {
+  const format = params.format ?? 'csv';
   const { apiUrl, apiToken } = getCredentials();
   const qs = buildExportQuery({ ...params, format });
   const url = `${apiUrl}/v1/incidents/export?${qs.toString()}`;
@@ -898,19 +910,27 @@ export async function exportIncidentsToFile(
 
   const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
   const buffer = Buffer.from(await response.arrayBuffer());
-
-  const dir = resolveExportDirectory(outputPath);
-  await mkdir(dir, { recursive: true });
-
-  // Prefer the API's dated filename (incidents-YYYY-MM-DD.ext), same as Twinpower UI.
   const fallbackName = buildDatedExportFilename(format);
   const preferredName = parseFilenameFromDisposition(
     response.headers.get('content-disposition'),
     fallbackName,
   );
-  // Keep extension aligned with the resolved format even if disposition is odd.
-  const baseName = preferredName.replace(/\.(csv|xlsx)$/i, '') + `.${format}`;
-  const desiredPath = join(dir, baseName);
+  const filename = preferredName.replace(/\.(csv|xlsx)$/i, '') + `.${format}`;
+
+  return { buffer, contentType, format, filename };
+}
+
+export async function exportIncidentsToFile(
+  params: ExportIncidentsParams,
+  outputPath: string,
+): Promise<{ path: string; bytes: number; contentType: string; format: 'csv' | 'xlsx' }> {
+  const format = resolveExportFormat(outputPath, params.format);
+  const { buffer, contentType, filename } = await exportIncidentsToBytes({ ...params, format });
+
+  const dir = resolveExportDirectory(outputPath);
+  await mkdir(dir, { recursive: true });
+
+  const desiredPath = join(dir, filename);
   const finalPath = await uniqueOutputPath(desiredPath);
 
   await writeFile(finalPath, buffer);
