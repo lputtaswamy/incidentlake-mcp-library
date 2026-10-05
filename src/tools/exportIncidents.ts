@@ -6,6 +6,11 @@ import {
   type ExportIncidentsParams,
 } from '../client';
 
+// Inline exports hold the raw buffer AND its ~1.33x base64 string in memory, then ship
+// the whole thing as one tool result. Cap at 5 MiB raw (~6.7 MiB base64) to stay under
+// hosted MCP response ceilings; oversized exports should narrow filters or use outputPath.
+const INLINE_EXPORT_MAX_BYTES = 5 * 1024 * 1024;
+
 export function registerExportIncidents(server: McpServer) {
   server.registerTool(
     'export_incidents',
@@ -19,6 +24,9 @@ export function registerExportIncidents(server: McpServer) {
         '(2) If outputPath is omitted, the file bytes are returned inline as an MCP embedded ' +
         'resource (base64) — intended for the remote hosted MCP server where the user\'s disk ' +
         'is not reachable; the client (e.g. Claude.ai web UI) renders a download link. ' +
+        'Inline mode is capped at 5 MiB raw to avoid exhausting hosted MCP response limits or ' +
+        'server memory — exceeding the cap returns an error asking you to narrow filters or use ' +
+        'outputPath. ' +
         'Supports the same filters as list_incidents. ' +
         'CSV supports UTF-8 or Shift-JIS encoding; Excel is always Unicode.',
       inputSchema: z.object({
@@ -105,6 +113,22 @@ export function registerExportIncidents(server: McpServer) {
         }
 
         const result = await exportIncidentsToBytes(params as ExportIncidentsParams);
+        if (result.buffer.length > INLINE_EXPORT_MAX_BYTES) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text:
+                  `Export too large for inline download: ${result.buffer.length} bytes > ` +
+                  `${INLINE_EXPORT_MAX_BYTES} byte cap (5 MiB). ` +
+                  `Narrow the result set with filters (status, severity, serviceId, tag, q), ` +
+                  `set hasNarrative=false, or re-run with outputPath on a stdio MCP install to ` +
+                  `write the file directly to disk.`,
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
           content: [
             {
