@@ -884,13 +884,71 @@ export interface ExportIncidentsBytes {
 }
 
 /**
+ * Thrown by `exportIncidentsToBytes` when the response body exceeds `maxBytes`.
+ * The stream is cancelled as soon as the limit trips, so we never materialise
+ * the oversized payload (or its ~1.33x base64 inflation) in memory.
+ */
+export class ExportSizeLimitError extends Error {
+  constructor(
+    public readonly limitBytes: number,
+    public readonly observedBytes: number,
+  ) {
+    super(
+      `Export response exceeded ${limitBytes}-byte limit (streamed at least ${observedBytes} bytes before aborting).`,
+    );
+    this.name = 'ExportSizeLimitError';
+  }
+}
+
+/**
+ * Read the body as a stream, enforcing `maxBytes` as it goes. If the limit is hit,
+ * cancel the reader (also aborting the underlying HTTP connection) and throw
+ * `ExportSizeLimitError` without ever accumulating the full payload. When `maxBytes`
+ * is omitted, read everything.
+ */
+async function readBodyWithLimit(response: Response, maxBytes?: number): Promise<Buffer> {
+  if (!response.body) {
+    // Fallback for runtimes that don't expose a streaming body (shouldn't happen on Node 18+).
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (maxBytes !== undefined && buffer.length > maxBytes) {
+      throw new ExportSizeLimitError(maxBytes, buffer.length);
+    }
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (maxBytes !== undefined && total > maxBytes) {
+        await reader.cancel(`Export exceeded ${maxBytes}-byte limit`).catch(() => {});
+        throw new ExportSizeLimitError(maxBytes, total);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return Buffer.concat(chunks, total);
+}
+
+/**
  * Fetch the export bytes without touching the filesystem. Used by both the file-writing
  * variant (local stdio) and the inline-download variant (remote hosted MCP, where the
  * server has no access to the user's disk and must return the file as an embedded
  * resource for the client to save).
+ *
+ * Pass `maxBytes` from the inline path so streaming aborts the connection the moment
+ * the limit trips — the file-writing path leaves it undefined (uncapped).
  */
 export async function exportIncidentsToBytes(
   params: ExportIncidentsParams,
+  maxBytes?: number,
 ): Promise<ExportIncidentsBytes> {
   const format = params.format ?? 'csv';
   const { apiUrl, apiToken } = getCredentials();
@@ -909,7 +967,7 @@ export async function exportIncidentsToBytes(
   }
 
   const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const buffer = await readBodyWithLimit(response, maxBytes);
   const fallbackName = buildDatedExportFilename(format);
   const preferredName = parseFilenameFromDisposition(
     response.headers.get('content-disposition'),

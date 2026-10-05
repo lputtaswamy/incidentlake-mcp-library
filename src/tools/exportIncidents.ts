@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   exportIncidentsToBytes,
   exportIncidentsToFile,
+  ExportSizeLimitError,
   type ExportIncidentsParams,
 } from '../client';
 
@@ -112,22 +113,30 @@ export function registerExportIncidents(server: McpServer) {
           };
         }
 
-        const result = await exportIncidentsToBytes(params as ExportIncidentsParams);
-        if (result.buffer.length > INLINE_EXPORT_MAX_BYTES) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text:
-                  `Export too large for inline download: ${result.buffer.length} bytes > ` +
-                  `${INLINE_EXPORT_MAX_BYTES} byte cap (5 MiB). ` +
-                  `Narrow the result set with filters (status, severity, serviceId, tag, q), ` +
-                  `set hasNarrative=false, or re-run with outputPath on a stdio MCP install to ` +
-                  `write the file directly to disk.`,
-              },
-            ],
-            isError: true,
-          };
+        let result;
+        try {
+          result = await exportIncidentsToBytes(
+            params as ExportIncidentsParams,
+            INLINE_EXPORT_MAX_BYTES,
+          );
+        } catch (err) {
+          if (err instanceof ExportSizeLimitError) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text:
+                    `Export too large for inline download: streamed at least ${err.observedBytes} ` +
+                    `bytes before aborting (cap: ${err.limitBytes} bytes / 5 MiB). ` +
+                    `Narrow the result set with filters (status, severity, serviceId, tag, q), ` +
+                    `set hasNarrative=false, or re-run with outputPath on a stdio MCP install to ` +
+                    `write the file directly to disk.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          throw err;
         }
         return {
           content: [
