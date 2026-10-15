@@ -41,6 +41,11 @@ import { registerListIncidentTasks } from './listIncidentTasks';
 import { registerCreateIncidentTask } from './createIncidentTask';
 import { registerUpdateIncidentTask } from './updateIncidentTask';
 import { registerDeleteIncidentTask } from './deleteIncidentTask';
+// Task external-issue linking
+import { registerLinkIncidentTaskExternalIssue } from './linkIncidentTaskExternalIssue';
+import { registerCreateIncidentTaskJiraIssue } from './createIncidentTaskJiraIssue';
+import { registerSyncIncidentTaskExternalIssue } from './syncIncidentTaskExternalIssue';
+import { registerUnlinkIncidentTaskExternalIssue } from './unlinkIncidentTaskExternalIssue';
 // SOP
 import { registerCompleteSopStep } from './completeSopStep';
 import { registerUncompleteSopStep } from './uncompleteSopStep';
@@ -55,8 +60,15 @@ import { registerListRelatedResources } from './listRelatedResources';
 import { registerAddRelatedResources } from './addRelatedResources';
 import { registerDeleteRelatedResource } from './deleteRelatedResource';
 import { registerAddRelatedResourceByUrl } from './addRelatedResourceByUrl';
+import { registerAddGrafanaRelatedResource } from './addGrafanaRelatedResource';
+import { registerAddSentryRelatedResource } from './addSentryRelatedResource';
+import { registerAddRollbarRelatedResource } from './addRollbarRelatedResource';
 import { registerAddSlackThread } from './addSlackThread';
 import { registerDeleteSlackThread } from './deleteSlackThread';
+// Meeting bots
+import { registerListIncidentMeetingBots } from './listIncidentMeetingBots';
+import { registerCreateIncidentMeetingBot } from './createIncidentMeetingBot';
+import { registerDeleteIncidentMeetingBot } from './deleteIncidentMeetingBot';
 // Reports
 import { registerListReportDrafts } from './listReportDrafts';
 import { registerCreateReportDraft } from './createReportDraft';
@@ -103,6 +115,11 @@ import { registerLinkRiskToIncident } from './linkRiskToIncident';
 import { registerListIntegrations } from './listIntegrations';
 import { registerSearchJiraIssues } from './searchJiraIssues';
 import { registerSearchNotionPages } from './searchNotionPages';
+import { registerSearchGrafanaResources } from './searchGrafanaResources';
+import { registerSearchSentryIssues } from './searchSentryIssues';
+import { registerSearchRollbarItems } from './searchRollbarItems';
+import { registerSearchOutlookMail } from './searchOutlookMail';
+import { registerGetOutlookMail } from './getOutlookMail';
 // Zabbix
 import { registerSearchZabbixProblems } from './searchZabbixProblems';
 import { registerAddZabbixRelatedResource } from './addZabbixRelatedResource';
@@ -169,6 +186,11 @@ export function registerTools(server: McpServer, { localFileAccess = true }: Reg
   registerCreateIncidentTask(server);
   registerUpdateIncidentTask(server);
   registerDeleteIncidentTask(server);
+  // Task external-issue linking
+  registerLinkIncidentTaskExternalIssue(server);
+  registerCreateIncidentTaskJiraIssue(server);
+  registerSyncIncidentTaskExternalIssue(server);
+  registerUnlinkIncidentTaskExternalIssue(server);
   // Commanders
   registerGetIncidentCommanders(server);
   registerGetCommanderHistory(server);
@@ -180,8 +202,15 @@ export function registerTools(server: McpServer, { localFileAccess = true }: Reg
   registerAddRelatedResources(server);
   registerDeleteRelatedResource(server);
   registerAddRelatedResourceByUrl(server);
+  registerAddGrafanaRelatedResource(server);
+  registerAddSentryRelatedResource(server);
+  registerAddRollbarRelatedResource(server);
   registerAddSlackThread(server);
   registerDeleteSlackThread(server);
+  // Meeting bots
+  registerListIncidentMeetingBots(server);
+  registerCreateIncidentMeetingBot(server);
+  registerDeleteIncidentMeetingBot(server);
   // Reports
   registerListReportDrafts(server);
   registerCreateReportDraft(server);
@@ -231,6 +260,11 @@ export function registerTools(server: McpServer, { localFileAccess = true }: Reg
   registerListIntegrations(server);
   registerSearchJiraIssues(server);
   registerSearchNotionPages(server);
+  registerSearchGrafanaResources(server);
+  registerSearchSentryIssues(server);
+  registerSearchRollbarItems(server);
+  registerSearchOutlookMail(server);
+  registerGetOutlookMail(server);
   // Zabbix
   registerSearchZabbixProblems(server);
   registerAddZabbixRelatedResource(server);

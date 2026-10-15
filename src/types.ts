@@ -186,6 +186,75 @@ export interface NotionSearchHit {
   objectType: 'page' | 'database';
 }
 
+/** Grafana dashboard or alert hit from GET /v1/integrations/grafana/search. */
+export interface GrafanaResource {
+  uid: string;
+  title: string;
+  kind: 'dashboard' | 'alert';
+  folder?: string | null;
+  url: string;
+}
+
+/** Sentry issue hit from GET /v1/integrations/sentry/search. */
+export interface SentryIssue {
+  id: string;
+  shortId?: string;
+  title: string;
+  level?: string;
+  status?: string;
+  project?: string;
+  url: string;
+}
+
+/** Rollbar item hit from GET /v1/integrations/rollbar/search. */
+export interface RollbarItem {
+  id: string | number;
+  counter: string | number;
+  title: string;
+  level?: string;
+  status?: string;
+  environment?: string;
+  url: string;
+}
+
+/** Outlook mail list item (body omitted; bodyPreview = first 300 chars). */
+export interface OutlookMailPreview {
+  id: string;
+  subject: string | null;
+  from: string | null;
+  receivedAt: string;
+  bodyPreview: string;
+}
+
+/** Full Outlook mail from GET /v1/integrations/outlook/mail/:id. */
+export interface OutlookMail {
+  id: string;
+  subject: string | null;
+  from: string | null;
+  receivedAt: string;
+  bodyText: string;
+}
+
+/** Meeting bot session from /v1/incidents/:id/meeting-bot. */
+export interface MeetingBotSession {
+  id: string;
+  incidentId: string;
+  provider?: string | null;
+  meetingUrl: string;
+  status: string;
+  language?: string | null;
+  requestedBy?: string | null;
+  requestedAt: string;
+  joinedAt?: string | null;
+  leftAt?: string | null;
+  failureReason?: string | null;
+  summary?: JsonValue;
+  recordingUrl?: string | null;
+  transcriptUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface IncidentSeverity {
   id: string;
   incidentId: string;
