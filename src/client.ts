@@ -20,6 +20,12 @@ import type {
   ApprovedKnowledgeDraft,
   JiraSearchHit,
   NotionSearchHit,
+  MeetingBotSession,
+  OutlookMail,
+  OutlookMailPreview,
+  GrafanaResource,
+  SentryIssue,
+  RollbarItem,
   IncidentSeverity,
   IncidentSeveritiesData,
   IncidentTask,
@@ -706,6 +712,96 @@ export const api = {
   searchNotionPages: (query?: string) => {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
     return apiRequest<NotionSearchHit[]>(`/v1/integrations/notion/search${qs}`);
+  },
+
+  // Task external-issue linking (Jira / Backlog / ServiceNow)
+  linkIncidentTaskExternalIssue: (incidentId: string, taskId: string, body: JsonObject) =>
+    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks/${taskId}/external-link`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createIncidentTaskJiraIssue: (incidentId: string, taskId: string, body: JsonObject) =>
+    apiRequest<IncidentTask>(
+      `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/jira-issue`,
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+    ),
+
+  syncIncidentTaskExternalIssue: (incidentId: string, taskId: string) =>
+    apiRequest<IncidentTask>(
+      `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/sync`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  unlinkIncidentTaskExternalIssue: (incidentId: string, taskId: string) =>
+    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks/${taskId}/external-link`, {
+      method: 'DELETE',
+    }),
+
+  // Related resources — per-integration structured attach
+  addIncidentRelatedResourceByGrafanaItem: (incidentId: string, body: JsonObject) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/grafana`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  addIncidentRelatedResourceBySentryIssue: (incidentId: string, body: JsonObject) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/sentry`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  addIncidentRelatedResourceByRollbarItem: (incidentId: string, body: JsonObject) =>
+    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/rollbar`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Meeting bot sessions
+  listIncidentMeetingBots: (incidentId: string) =>
+    apiRequest<MeetingBotSession[]>(`/v1/incidents/${incidentId}/meeting-bot`),
+
+  // createIncidentMeetingBot is NOT retried: the server dispatches a bot asynchronously
+  // and the dispatch is not idempotent — a retry after a timeout can send a second bot.
+  createIncidentMeetingBot: (incidentId: string, body: JsonObject) =>
+    apiRequest<MeetingBotSession>(
+      `/v1/incidents/${incidentId}/meeting-bot`,
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+    ),
+
+  deleteIncidentMeetingBot: (incidentId: string, sessionId: string) =>
+    apiRequest<MeetingBotSession>(
+      `/v1/incidents/${incidentId}/meeting-bot/${sessionId}`,
+      { method: 'DELETE' },
+    ),
+
+  // Outlook mailbox search
+  searchOutlookMail: (query: string, hoursBack?: number, limit?: number) => {
+    const qs = new URLSearchParams({ q: query });
+    if (hoursBack !== undefined) qs.set('hoursBack', String(hoursBack));
+    if (limit !== undefined) qs.set('limit', String(limit));
+    return apiRequest<OutlookMailPreview[]>(`/v1/integrations/outlook/mail?${qs.toString()}`);
+  },
+
+  getOutlookMail: (id: string) =>
+    apiRequest<OutlookMail>(`/v1/integrations/outlook/mail/${id}`),
+
+  // Grafana / Sentry / Rollbar search
+  searchGrafanaResources: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<GrafanaResource[]>(`/v1/integrations/grafana/search${qs}`);
+  },
+
+  searchSentryIssues: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<SentryIssue[]>(`/v1/integrations/sentry/search${qs}`);
+  },
+
+  searchRollbarItems: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<RollbarItem[]>(`/v1/integrations/rollbar/search${qs}`);
   },
 };
 

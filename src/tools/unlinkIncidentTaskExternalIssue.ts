@@ -1,0 +1,29 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { api } from '../client';
+
+export function registerUnlinkIncidentTaskExternalIssue(server: McpServer) {
+  server.registerTool(
+    'unlink_incident_task_external_issue',
+    {
+      description:
+        'Remove the external tracker link from an incident task. The task keeps its current field values; the issue itself is not deleted.',
+      inputSchema: z.object({
+        incidentId: z.string().uuid().describe('The UUID of the incident'),
+        taskId: z.string().uuid().describe('The UUID of the task'),
+      }),
+    },
+    async (input) => {
+      try {
+        const data = await api.unlinkIncidentTaskExternalIssue(input.incidentId, input.taskId);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error occurred';
+        return {
+          content: [{ type: 'text' as const, text: `Error unlinking external issue: ${msg}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+}

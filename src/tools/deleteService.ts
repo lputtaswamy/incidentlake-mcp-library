@@ -6,7 +6,8 @@ export function registerDeleteService(server: McpServer) {
   server.registerTool(
     'delete_service',
     {
-      description: 'Delete a CMDB service by ID.',
+      description:
+        'Retire a CMDB service by ID (soft-delete). The service is marked retired and no longer appears in list_services; existing incidents keep their references.',
       inputSchema: z.object({
         serviceId: z.string().uuid().describe('The UUID of the service to delete'),
       }),
