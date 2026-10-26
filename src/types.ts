@@ -185,6 +185,47 @@ export interface PendingKnowledgeDraft {
 /** Approved AI knowledge draft (POST /v1/knowledge/{id}/approve). */
 export type ApprovedKnowledgeDraft = Omit<PendingKnowledgeDraft, 'createdByEmail'>;
 
+/** GitHub issue or pull request hit from GET /v1/integrations/github/issues. */
+export interface GitHubSearchHit {
+  number: number;
+  kind: 'issue' | 'pull';
+  title: string;
+  /** 'open' | 'closed' | 'merged' */
+  state: string;
+  htmlUrl: string;
+  author: string | null;
+  updatedAt: string | null;
+}
+
+/** Providers accepted by POST /v1/integrations/{provider}/verify-connection. */
+export const INTEGRATION_CONNECTION_PROVIDERS = [
+  'notion',
+  'datadog',
+  'grafana',
+  'sentry',
+  'rollbar',
+  'backlog',
+  'statuspage',
+  'jira',
+  'zabbix',
+  'instana',
+  'github',
+  'servicenow',
+  'netbox',
+  'outlook',
+] as const;
+export type IntegrationConnectionProvider = (typeof INTEGRATION_CONNECTION_PROVIDERS)[number];
+
+/** Result of testing a saved integration. A failed credential is still a successful HTTP call. */
+export interface IntegrationConnectionTest {
+  provider: IntegrationConnectionProvider;
+  result: 'ok' | 'unauthorized' | 'forbidden' | 'unreachable' | 'unexpected';
+  httpStatus: number | null;
+  code?: string;
+  detail?: string;
+  message: string;
+}
+
 /** Jira issue hit from GET /v1/integrations/jira/issues. */
 export interface JiraSearchHit {
   issueKey: string;

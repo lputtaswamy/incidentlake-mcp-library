@@ -18,6 +18,9 @@ import type {
   CurrentTenant,
   PendingKnowledgeDraft,
   ApprovedKnowledgeDraft,
+  GitHubSearchHit,
+  IntegrationConnectionProvider,
+  IntegrationConnectionTest,
   JiraSearchHit,
   NotionSearchHit,
   MeetingBotSession,
@@ -855,6 +858,17 @@ export const api = {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
     return apiRequest<JiraSearchHit[]>(`/v1/integrations/jira/issues${qs}`);
   },
+
+  searchGitHubIssues: (query?: string) => {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    return apiRequest<GitHubSearchHit[]>(`/v1/integrations/github/issues${qs}`);
+  },
+
+  verifyIntegrationConnection: (provider: IntegrationConnectionProvider) =>
+    apiRequest<IntegrationConnectionTest>(
+      `/v1/integrations/${encodeURIComponent(provider)}/verify-connection`,
+      { method: 'POST', body: '{}' },
+    ),
 
   searchNotionPages: (query?: string) => {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
