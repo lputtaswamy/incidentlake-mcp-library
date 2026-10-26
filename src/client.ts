@@ -254,11 +254,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // Severity publishes a new history row. A retry after a timeout or 5xx would
+  // insert a duplicate, so those bodies are not retried. Other fields replace in place.
   updateIncident: (id: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
-    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}`, opts?.includeDrills), {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
+    apiRequest<IncidentDetail>(
+      withIncludeDrills(`/v1/incidents/${id}`, opts?.includeDrills),
+      { method: 'PATCH', body: JSON.stringify(body) },
+      body.severity !== undefined ? 0 : MAX_RETRIES,
+    ),
 
   resolveIncident: (id: string, opts?: IncludeDrillsOpts) =>
     apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/resolve`, opts?.includeDrills), {
