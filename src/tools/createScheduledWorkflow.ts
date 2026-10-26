@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 const VALID_ACTION_TYPES = [
@@ -15,6 +16,7 @@ const VALID_ACTION_TYPES = [
 const inputSchema = z
   .object({
     incidentId: z.string().uuid().describe('The UUID of the incident'),
+    includeDrills: zIncludeDrills,
     scheduleType: z
       .enum(['delay', 'specific_time', 'recurring'])
       .describe(
@@ -136,7 +138,7 @@ export function registerCreateScheduledWorkflow(server: McpServer) {
         if (input.targetChannelName !== undefined) body.targetChannelName = input.targetChannelName;
         if (input.timezone !== undefined) body.timezone = input.timezone;
 
-        const data = await api.createScheduledWorkflow(input.incidentId, body);
+        const data = await api.createScheduledWorkflow(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

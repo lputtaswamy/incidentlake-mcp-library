@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerUpdateIncidentPhaseNode(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerUpdateIncidentPhaseNode(server: McpServer) {
         'Rename, redescribe, or reposition a phase on an incident\'s response timeline. Send at least one field. nodeId must come from get_incident_phase_graph after it returns isCustom true, or from a prior create_incident_phase_node call for this same incident.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         nodeId: z.string().uuid().describe('The phase node UUID to update'),
         label: z.string().min(1).optional().describe('New phase name'),
         description: z
@@ -39,7 +41,7 @@ export function registerUpdateIncidentPhaseNode(server: McpServer) {
           };
         }
 
-        const data = await api.updateIncidentPhaseNode(input.incidentId, input.nodeId, body);
+        const data = await api.updateIncidentPhaseNode(input.incidentId, input.nodeId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

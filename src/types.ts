@@ -7,15 +7,33 @@ export type JsonObject = { [key: string]: JsonValue };
  * Incident status values.
  * Accepts exactly this set.
  */
-export const INCIDENT_STATUSES = ['ongoing', 'resolved', 'stalled', 'cancelled'] as const;
+export const INCIDENT_STATUSES = [
+  'ongoing',
+  'resolved',
+  'stalled',
+  'cancelled',
+  'false_positive',
+] as const;
 export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
 
 /**
- * create body — OpenAPI only documents ongoing | resolved.
- * The handler applies other statuses via update after insert only when non-ongoing.
+ * POST /v1/incidents accepts the same status set as PATCH. Omitted status stays ongoing.
  */
-export const CREATE_INCIDENT_STATUSES = ['ongoing', 'resolved'] as const;
-export type IncidentCreateStatus = (typeof CREATE_INCIDENT_STATUSES)[number];
+export const CREATE_INCIDENT_STATUSES = INCIDENT_STATUSES;
+export type IncidentCreateStatus = (typeof INCIDENT_STATUSES)[number];
+
+export const INCIDENT_CATEGORIES = ['system', 'security', 'operational'] as const;
+export type IncidentCategory = (typeof INCIDENT_CATEGORIES)[number];
+
+/** Task activity types accepted by the public task create/update routes. */
+export const INCIDENT_ACTIVITY_TYPES = [
+  'client_communication',
+  'engineering_response',
+  'customer_engineer_investigation',
+  'product_engineer_investigation',
+  'impact_scope_assessment',
+] as const;
+export type IncidentActivityType = (typeof INCIDENT_ACTIVITY_TYPES)[number];
 
 export interface Incident {
   id: string;

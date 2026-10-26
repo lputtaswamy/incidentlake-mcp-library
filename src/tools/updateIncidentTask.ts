@@ -1,8 +1,31 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
-import type { JsonObject } from '../types';
-import { TASK_STATUSES, zTaskStatus } from '../incidentZod';
+import { TASK_STATUSES, zActivityType, zIncludeDrills, zRelatedIncidents, zTaskStatus } from '../incidentZod';
+import type { IncidentActivityType, JsonObject, JsonValue } from '../types';
+
+type RelatedIncidentInput = {
+  id: string;
+  name?: string | null;
+  severity?: number | null;
+  status: string;
+  createdAt: string;
+  resolutionSummary?: string | null;
+  similarity?: number;
+};
+
+type UpdateIncidentTaskInput = {
+  incidentId: string;
+  taskId: string;
+  title?: string;
+  content?: string | null;
+  currentStatus?: (typeof TASK_STATUSES)[number];
+  dueDate?: string | null;
+  assigneeEmail?: string | null;
+  relatedIncidents?: RelatedIncidentInput[] | null;
+  activityType?: IncidentActivityType | null;
+  includeDrills?: boolean;
+};
 
 export function registerUpdateIncidentTask(server: McpServer) {
   server.registerTool(
@@ -34,9 +57,12 @@ export function registerUpdateIncidentTask(server: McpServer) {
           .nullable()
           .optional()
           .describe('Email of member to assign; null clears assignment'),
-      }),
+        relatedIncidents: zRelatedIncidents,
+        activityType: zActivityType,
+        includeDrills: zIncludeDrills,
+      }) as z.ZodType<UpdateIncidentTaskInput>,
     },
-    async (input) => {
+    async (input: UpdateIncidentTaskInput) => {
       try {
         const body: JsonObject = {};
         if (input.title !== undefined) body.title = input.title;
@@ -44,6 +70,10 @@ export function registerUpdateIncidentTask(server: McpServer) {
         if (input.currentStatus !== undefined) body.currentStatus = input.currentStatus;
         if (input.dueDate !== undefined) body.dueDate = input.dueDate;
         if (input.assigneeEmail !== undefined) body.assigneeEmail = input.assigneeEmail;
+        if (input.relatedIncidents !== undefined) {
+          body.relatedIncidents = input.relatedIncidents as JsonValue;
+        }
+        if (input.activityType !== undefined) body.activityType = input.activityType;
 
         if (Object.keys(body).length === 0) {
           return {
@@ -52,7 +82,9 @@ export function registerUpdateIncidentTask(server: McpServer) {
           };
         }
 
-        const data = await api.updateIncidentTask(input.incidentId, input.taskId, body);
+        const data = await api.updateIncidentTask(input.incidentId, input.taskId, body, {
+          includeDrills: input.includeDrills,
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

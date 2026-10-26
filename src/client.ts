@@ -193,15 +193,29 @@ async function apiRequest<T>(
   throw lastError || new Error('Request failed after retries');
 }
 
+/** Drill incidents stay hidden unless the caller opts in. Omitted or false keeps today's default. */
+export function withIncludeDrills(path: string, includeDrills?: boolean): string {
+  if (includeDrills !== true) return path;
+  return path.includes('?') ? `${path}&includeDrills=true` : `${path}?includeDrills=true`;
+}
+
+export type IncludeDrillsOpts = { includeDrills?: boolean };
+
 export const api = {
   getCurrentTenant: () => apiRequest<CurrentTenant>('/v1/me'),
 
   listIncidents: (params: URLSearchParams) =>
     apiRequest<PaginatedIncidents>(`/v1/incidents?${params.toString()}`),
 
-  getIncident: (id: string) => apiRequest<IncidentDetail>(`/v1/incidents/${id}`),
+  getIncident: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}`, opts?.includeDrills)),
 
-  searchIncidents: (q: string, limit?: number, tags?: string[]) => {
+  searchIncidents: (
+    q: string,
+    limit?: number,
+    tags?: string[],
+    options?: { category?: string[]; includeDrills?: boolean },
+  ) => {
     const params = new URLSearchParams();
     params.set('q', q);
     if (limit !== undefined) params.set('limit', String(limit));
@@ -210,63 +224,74 @@ export const api = {
         params.append('tag', t);
       }
     }
+    for (const category of options?.category ?? []) params.append('category', category);
+    if (options?.includeDrills) params.set('includeDrills', 'true');
     return apiRequest<SearchResult>(`/v1/incidents/search?${params.toString()}`);
   },
 
-  getAnalytics: (startDate: string, endDate: string) =>
+  getAnalytics: (startDate: string, endDate: string, includeDrills?: boolean) =>
     apiRequest<AnalyticsData>(
-      `/v1/incidents/analytics?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+      withIncludeDrills(
+        `/v1/incidents/analytics?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+        includeDrills,
+      ),
     ),
 
   createIncident: (body: JsonObject) =>
     apiRequest<IncidentDetail>('/v1/incidents', { method: 'POST', body: JSON.stringify(body) }),
 
-  getSopCompletions: (id: string) =>
-    apiRequest<SopCompletionsData>(`/v1/incidents/${id}/sop-completions`),
+  getSopCompletions: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<SopCompletionsData>(
+      withIncludeDrills(`/v1/incidents/${id}/sop-completions`, opts?.includeDrills),
+    ),
 
-  addIncidentNote: (id: string, body: JsonObject) =>
-    apiRequest<IncidentNote>(`/v1/incidents/${id}/notes`, {
+  addIncidentNote: (id: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentNote>(withIncludeDrills(`/v1/incidents/${id}/notes`, opts?.includeDrills), {
       method: 'POST',
       body: JSON.stringify(body),
     }),
 
-  updateIncident: (id: string, body: JsonObject) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}`, {
+  updateIncident: (id: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}`, opts?.includeDrills), {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
 
-  resolveIncident: (id: string) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}/resolve`, {
+  resolveIncident: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/resolve`, opts?.includeDrills), {
       method: 'POST',
       body: '{}',
     }),
 
-  reopenIncident: (id: string) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}/reopen`, {
+  reopenIncident: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/reopen`, opts?.includeDrills), {
       method: 'POST',
       body: '{}',
     }),
 
-  deleteIncident: (id: string) =>
-    apiRequest<{ id: string; deleted: boolean }>(`/v1/incidents/${id}`, { method: 'DELETE' }),
+  deleteIncident: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<{ id: string; deleted: boolean }>(
+      withIncludeDrills(`/v1/incidents/${id}`, opts?.includeDrills),
+      { method: 'DELETE' },
+    ),
 
-  getIncidentTags: (id: string) => apiRequest<{ tags: string[] }>(`/v1/incidents/${id}/tags`),
+  getIncidentTags: (id: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<{ tags: string[] }>(withIncludeDrills(`/v1/incidents/${id}/tags`, opts?.includeDrills)),
 
-  addIncidentTags: (id: string, tags: string[]) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}/tags`, {
+  addIncidentTags: (id: string, tags: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/tags`, opts?.includeDrills), {
       method: 'POST',
       body: JSON.stringify({ tags }),
     }),
 
-  updateIncidentTags: (id: string, tags: string[]) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}/tags`, {
+  updateIncidentTags: (id: string, tags: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/tags`, opts?.includeDrills), {
       method: 'PATCH',
       body: JSON.stringify({ tags }),
     }),
 
-  removeIncidentTags: (id: string, tags: string[]) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${id}/tags`, {
+  removeIncidentTags: (id: string, tags: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${id}/tags`, opts?.includeDrills), {
       method: 'DELETE',
       body: JSON.stringify({ tags }),
     }),
@@ -327,118 +352,178 @@ export const api = {
     ),
 
   // Severities
-  listIncidentSeverities: (incidentId: string) =>
-    apiRequest<IncidentSeveritiesData>(`/v1/incidents/${incidentId}/severities`),
+  listIncidentSeverities: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentSeveritiesData>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/severities`, opts?.includeDrills),
+    ),
 
-  createIncidentSeverity: (incidentId: string, body: JsonObject) =>
-    apiRequest<IncidentSeverity>(`/v1/incidents/${incidentId}/severities`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  updateIncidentSeverity: (incidentId: string, severityId: string, body: JsonObject) =>
-    apiRequest<IncidentSeverity>(`/v1/incidents/${incidentId}/severities/${severityId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
-
-  publishIncidentSeverity: (incidentId: string, severityId: string) =>
+  createIncidentSeverity: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
     apiRequest<IncidentSeverity>(
-      `/v1/incidents/${incidentId}/severities/${severityId}/publish`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/severities`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  updateIncidentSeverity: (
+    incidentId: string,
+    severityId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<IncidentSeverity>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/severities/${severityId}`, opts?.includeDrills),
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  publishIncidentSeverity: (incidentId: string, severityId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentSeverity>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/severities/${severityId}/publish`,
+        opts?.includeDrills,
+      ),
       { method: 'POST', body: '{}' },
     ),
 
   // Notes
-  listIncidentNotes: (incidentId: string) =>
-    apiRequest<IncidentNote[]>(`/v1/incidents/${incidentId}/notes`),
+  listIncidentNotes: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentNote[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/notes`, opts?.includeDrills),
+    ),
 
-  updateIncidentNote: (incidentId: string, noteId: string, body: JsonObject) =>
-    apiRequest<IncidentNote>(`/v1/incidents/${incidentId}/notes/${noteId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
+  updateIncidentNote: (
+    incidentId: string,
+    noteId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<IncidentNote>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/notes/${noteId}`, opts?.includeDrills),
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  deleteIncidentNote: (incidentId: string, noteId: string) =>
+  deleteIncidentNote: (incidentId: string, noteId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ id: string; deleted: boolean }>(
-      `/v1/incidents/${incidentId}/notes/${noteId}`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/notes/${noteId}`, opts?.includeDrills),
       { method: 'DELETE' },
     ),
 
   // Tasks
-  listIncidentTasks: (incidentId: string) =>
-    apiRequest<IncidentTask[]>(`/v1/incidents/${incidentId}/tasks`),
+  listIncidentTasks: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentTask[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/tasks`, opts?.includeDrills),
+    ),
 
-  createIncidentTask: (incidentId: string, body: JsonObject) =>
-    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createIncidentTask: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentTask>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/tasks`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  updateIncidentTask: (incidentId: string, taskId: string, body: JsonObject) =>
-    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks/${taskId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
+  updateIncidentTask: (
+    incidentId: string,
+    taskId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<IncidentTask>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/tasks/${taskId}`, opts?.includeDrills),
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  deleteIncidentTask: (incidentId: string, taskId: string) =>
+  deleteIncidentTask: (incidentId: string, taskId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ id: string; deleted: boolean }>(
-      `/v1/incidents/${incidentId}/tasks/${taskId}`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/tasks/${taskId}`, opts?.includeDrills),
       { method: 'DELETE' },
     ),
 
   // SOP completions
-  completeSopStep: (incidentId: string, stepId: string, body: JsonObject) =>
-    apiRequest<JsonObject>(`/v1/incidents/${incidentId}/sop-completions/${stepId}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
+  completeSopStep: (incidentId: string, stepId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<JsonObject>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/sop-completions/${stepId}`, opts?.includeDrills),
+      {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  uncompleteSopStep: (incidentId: string, stepId: string) =>
+  uncompleteSopStep: (incidentId: string, stepId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ stepId: string; deleted: boolean }>(
-      `/v1/incidents/${incidentId}/sop-completions/${stepId}`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/sop-completions/${stepId}`, opts?.includeDrills),
       { method: 'DELETE' },
     ),
 
   // Commanders
-  getIncidentCommanders: (incidentId: string) =>
+  getIncidentCommanders: (incidentId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ assignees: Array<{ name: string | null; email: string | null }> }>(
-      `/v1/incidents/${incidentId}/commander`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/commander`, opts?.includeDrills),
     ),
 
-  getCommanderHistory: (incidentId: string) =>
-    apiRequest<CommanderHistoryEntry[]>(`/v1/incidents/${incidentId}/commander/history`),
+  getCommanderHistory: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<CommanderHistoryEntry[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/commander/history`, opts?.includeDrills),
+    ),
 
   // Services
-  getIncidentServices: (incidentId: string) =>
-    apiRequest<IncidentService[]>(`/v1/incidents/${incidentId}/services`),
+  getIncidentServices: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentService[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/services`, opts?.includeDrills),
+    ),
 
-  updateIncidentServices: (incidentId: string, serviceIds: string[]) =>
-    apiRequest<IncidentService[]>(`/v1/incidents/${incidentId}/services`, {
-      method: 'PATCH',
-      body: JSON.stringify({ serviceIds }),
-    }),
+  updateIncidentServices: (incidentId: string, serviceIds: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentService[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/services`, opts?.includeDrills),
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ serviceIds }),
+      },
+    ),
 
   // Related resources
-  listRelatedResources: (incidentId: string) =>
-    apiRequest<RelatedResource[]>(`/v1/incidents/${incidentId}/related-resources`),
+  listRelatedResources: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<RelatedResource[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources`, opts?.includeDrills),
+    ),
 
-  addRelatedResources: (incidentId: string, resourceIds: string[]) =>
-    apiRequest<RelatedResource[]>(`/v1/incidents/${incidentId}/related-resources`, {
-      method: 'POST',
-      body: JSON.stringify({ resourceIds }),
-    }),
+  addRelatedResources: (incidentId: string, resourceIds: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<RelatedResource[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify({ resourceIds }),
+      },
+    ),
 
-  deleteRelatedResource: (incidentId: string, resourceId: string) =>
+  deleteRelatedResource: (incidentId: string, resourceId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ id: string; deleted: boolean }>(
-      `/v1/incidents/${incidentId}/related-resources/${resourceId}`,
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/related-resources/${resourceId}`,
+        opts?.includeDrills,
+      ),
       { method: 'DELETE' },
     ),
 
-  addRelatedResourceByUrl: (incidentId: string, url: string) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/url`, {
-      method: 'POST',
-      body: JSON.stringify({ url }),
-    }),
+  addRelatedResourceByUrl: (incidentId: string, url: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/url`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      },
+    ),
 
   // Slack threads
   //
@@ -447,49 +532,64 @@ export const api = {
   // ingestion can outlive the client timeout after the link row is already committed.
   // A retry would then surface as a misleading 409 "already linked" instead of the
   // ingestion result — see apiRequest's maxRetries.
-  addSlackThread: (incidentId: string, url: string) =>
+  addSlackThread: (incidentId: string, url: string, opts?: IncludeDrillsOpts) =>
     apiRequest<SlackThread>(
-      `/v1/incidents/${incidentId}/slack-threads`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/slack-threads`, opts?.includeDrills),
       { method: 'POST', body: JSON.stringify({ url }) },
       0,
     ),
 
-  deleteSlackThread: (incidentId: string, threadId: string) =>
+  deleteSlackThread: (incidentId: string, threadId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ id: string; deleted: boolean }>(
-      `/v1/incidents/${incidentId}/slack-threads/${threadId}`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/slack-threads/${threadId}`, opts?.includeDrills),
       { method: 'DELETE' },
     ),
 
   // Reports
-  listReportDrafts: (incidentId: string, draftType?: string) => {
+  listReportDrafts: (incidentId: string, draftType?: string, opts?: IncludeDrillsOpts) => {
     const qs = draftType ? `?draftType=${encodeURIComponent(draftType)}` : '';
-    return apiRequest<ReportDraft[]>(`/v1/incidents/${incidentId}/report-drafts${qs}`);
+    return apiRequest<ReportDraft[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/report-drafts${qs}`, opts?.includeDrills),
+    );
   },
 
-  createReportDraft: (incidentId: string, body: JsonObject) =>
-    apiRequest<ReportDraft>(`/v1/incidents/${incidentId}/report-drafts`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createReportDraft: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<ReportDraft>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/report-drafts`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  listPublishedReports: (incidentId: string, reportType?: string) => {
+  listPublishedReports: (incidentId: string, reportType?: string, opts?: IncludeDrillsOpts) => {
     const qs = reportType ? `?reportType=${encodeURIComponent(reportType)}` : '';
-    return apiRequest<PublishedReport[]>(`/v1/incidents/${incidentId}/published-reports${qs}`);
+    return apiRequest<PublishedReport[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/published-reports${qs}`, opts?.includeDrills),
+    );
   },
 
   // Scheduled workflows
-  listScheduledWorkflows: (incidentId: string) =>
-    apiRequest<ScheduledWorkflow[]>(`/v1/incidents/${incidentId}/scheduled-workflows`),
+  listScheduledWorkflows: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<ScheduledWorkflow[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/scheduled-workflows`, opts?.includeDrills),
+    ),
 
-  createScheduledWorkflow: (incidentId: string, body: JsonObject) =>
-    apiRequest<ScheduledWorkflow>(`/v1/incidents/${incidentId}/scheduled-workflows`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createScheduledWorkflow: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<ScheduledWorkflow>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/scheduled-workflows`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  cancelScheduledWorkflow: (incidentId: string, workflowId: string) =>
+  cancelScheduledWorkflow: (incidentId: string, workflowId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ id: string; status: string }>(
-      `/v1/incidents/${incidentId}/scheduled-workflows/${workflowId}`,
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/scheduled-workflows/${workflowId}`,
+        opts?.includeDrills,
+      ),
       { method: 'DELETE' },
     ),
 
@@ -515,15 +615,19 @@ export const api = {
     }),
 
   // Blast radius
-  getIncidentBlastRadius: (incidentId: string) =>
-    apiRequest<BlastRadius>(`/v1/incidents/${incidentId}/blast-radius`),
+  getIncidentBlastRadius: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<BlastRadius>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/blast-radius`, opts?.includeDrills),
+    ),
 
   // Services (CMDB)
   listServices: (params?: URLSearchParams) =>
     apiRequest<Service[]>(`/v1/services${params ? `?${params.toString()}` : ''}`),
 
-  getService: (serviceId: string) =>
-    apiRequest<Service>(`/v1/services/${serviceId}`),
+  getService: (serviceId: string, includeRetired?: boolean) =>
+    apiRequest<Service>(
+      `/v1/services/${serviceId}${includeRetired === true ? '?includeRetired=true' : ''}`,
+    ),
 
   createService: (body: JsonObject) =>
     apiRequest<Service>('/v1/services', { method: 'POST', body: JSON.stringify(body) }),
@@ -624,61 +728,98 @@ export const api = {
   // RBAC tags
   listRbacTags: () => apiRequest<RbacTag[]>('/v1/rbac-tags'),
 
-  updateIncidentRbacTags: (incidentId: string, rbacTagIds: string[]) =>
-    apiRequest<IncidentDetail>(`/v1/incidents/${incidentId}`, {
+  updateIncidentRbacTags: (incidentId: string, rbacTagIds: string[], opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentDetail>(withIncludeDrills(`/v1/incidents/${incidentId}`, opts?.includeDrills), {
       method: 'PATCH',
       body: JSON.stringify({ rbacTagIds }),
     }),
 
   // Response Timeline (phase graph + telemetry)
-  getIncidentPhaseGraph: (incidentId: string) =>
-    apiRequest<PhaseGraph>(`/v1/incidents/${incidentId}/phase-graph`),
+  getIncidentPhaseGraph: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<PhaseGraph>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-graph`, opts?.includeDrills),
+    ),
 
-  createIncidentPhaseNode: (incidentId: string, body: JsonObject) =>
-    apiRequest<PhaseNode>(`/v1/incidents/${incidentId}/phase-graph/nodes`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createIncidentPhaseNode: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<PhaseNode>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-graph/nodes`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  updateIncidentPhaseNode: (incidentId: string, nodeId: string, body: JsonObject) =>
-    apiRequest<PhaseNode>(`/v1/incidents/${incidentId}/phase-graph/nodes/${nodeId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
+  updateIncidentPhaseNode: (
+    incidentId: string,
+    nodeId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<PhaseNode>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/phase-graph/nodes/${nodeId}`,
+        opts?.includeDrills,
+      ),
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  deleteIncidentPhaseNode: (incidentId: string, nodeId: string) =>
+  deleteIncidentPhaseNode: (incidentId: string, nodeId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<{ success: boolean; isArchived: boolean }>(
-      `/v1/incidents/${incidentId}/phase-graph/nodes/${nodeId}`,
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/phase-graph/nodes/${nodeId}`,
+        opts?.includeDrills,
+      ),
       { method: 'DELETE' },
     ),
 
-  createIncidentPhaseEdge: (incidentId: string, body: JsonObject) =>
-    apiRequest<PhaseEdge>(`/v1/incidents/${incidentId}/phase-graph/edges`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createIncidentPhaseEdge: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<PhaseEdge>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-graph/edges`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  deleteIncidentPhaseEdge: (incidentId: string, edgeId: string) =>
-    apiRequest<{ success: boolean }>(`/v1/incidents/${incidentId}/phase-graph/edges/${edgeId}`, {
-      method: 'DELETE',
-    }),
+  deleteIncidentPhaseEdge: (incidentId: string, edgeId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<{ success: boolean }>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/phase-graph/edges/${edgeId}`,
+        opts?.includeDrills,
+      ),
+      { method: 'DELETE' },
+    ),
 
-  listIncidentPhaseCaptures: (incidentId: string) =>
-    apiRequest<PhaseCapture[]>(`/v1/incidents/${incidentId}/phase-captures`),
+  listIncidentPhaseCaptures: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<PhaseCapture[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-captures`, opts?.includeDrills),
+    ),
 
-  createIncidentPhaseCapture: (incidentId: string, body: JsonObject) =>
-    apiRequest<PhaseCapture>(`/v1/incidents/${incidentId}/phase-captures`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  createIncidentPhaseCapture: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<PhaseCapture>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-captures`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  deleteIncidentPhaseCapture: (incidentId: string, captureId: string) =>
-    apiRequest<{ success: boolean }>(`/v1/incidents/${incidentId}/phase-captures/${captureId}`, {
-      method: 'DELETE',
-    }),
+  deleteIncidentPhaseCapture: (incidentId: string, captureId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<{ success: boolean }>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/phase-captures/${captureId}`,
+        opts?.includeDrills,
+      ),
+      { method: 'DELETE' },
+    ),
 
-  getIncidentPhaseTelemetry: (incidentId: string) =>
-    apiRequest<IncidentPhaseTelemetry>(`/v1/incidents/${incidentId}/phase-telemetry`),
+  getIncidentPhaseTelemetry: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentPhaseTelemetry>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/phase-telemetry`, opts?.includeDrills),
+    ),
 
   // Zabbix
   searchZabbixProblems: (query?: string) => {
@@ -686,11 +827,14 @@ export const api = {
     return apiRequest<ZabbixProblem[]>(`/v1/integrations/zabbix/problems${qs}`);
   },
 
-  addZabbixRelatedResource: (incidentId: string, body: JsonObject) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/zabbix`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  addZabbixRelatedResource: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/zabbix`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
   // Instana
   searchInstanaEvents: (query?: string) => {
@@ -698,11 +842,14 @@ export const api = {
     return apiRequest<InstanaEvent[]>(`/v1/integrations/instana/events${qs}`);
   },
 
-  addInstanaRelatedResource: (incidentId: string, body: JsonObject) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/instana`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  addInstanaRelatedResource: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/instana`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
   searchJiraIssues: (query?: string) => {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
@@ -715,65 +862,114 @@ export const api = {
   },
 
   // Task external-issue linking (Jira / Backlog / ServiceNow)
-  linkIncidentTaskExternalIssue: (incidentId: string, taskId: string, body: JsonObject) =>
-    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks/${taskId}/external-link`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  createIncidentTaskJiraIssue: (incidentId: string, taskId: string, body: JsonObject) =>
+  linkIncidentTaskExternalIssue: (
+    incidentId: string,
+    taskId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
     apiRequest<IncidentTask>(
-      `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/jira-issue`,
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/tasks/${taskId}/external-link`,
+        opts?.includeDrills,
+      ),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  createIncidentTaskJiraIssue: (
+    incidentId: string,
+    taskId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<IncidentTask>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/jira-issue`,
+        opts?.includeDrills,
+      ),
       { method: 'POST', body: JSON.stringify(body) },
       0,
     ),
 
-  syncIncidentTaskExternalIssue: (incidentId: string, taskId: string) =>
+  syncIncidentTaskExternalIssue: (incidentId: string, taskId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<IncidentTask>(
-      `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/sync`,
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/tasks/${taskId}/external-link/sync`,
+        opts?.includeDrills,
+      ),
       { method: 'POST', body: '{}' },
     ),
 
-  unlinkIncidentTaskExternalIssue: (incidentId: string, taskId: string) =>
-    apiRequest<IncidentTask>(`/v1/incidents/${incidentId}/tasks/${taskId}/external-link`, {
-      method: 'DELETE',
-    }),
+  unlinkIncidentTaskExternalIssue: (incidentId: string, taskId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<IncidentTask>(
+      withIncludeDrills(
+        `/v1/incidents/${incidentId}/tasks/${taskId}/external-link`,
+        opts?.includeDrills,
+      ),
+      { method: 'DELETE' },
+    ),
 
   // Related resources — per-integration structured attach
-  addIncidentRelatedResourceByGrafanaItem: (incidentId: string, body: JsonObject) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/grafana`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  addIncidentRelatedResourceByGrafanaItem: (
+    incidentId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/grafana`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  addIncidentRelatedResourceBySentryIssue: (incidentId: string, body: JsonObject) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/sentry`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  addIncidentRelatedResourceBySentryIssue: (
+    incidentId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/sentry`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
-  addIncidentRelatedResourceByRollbarItem: (incidentId: string, body: JsonObject) =>
-    apiRequest<RelatedResource>(`/v1/incidents/${incidentId}/related-resources/rollbar`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+  addIncidentRelatedResourceByRollbarItem: (
+    incidentId: string,
+    body: JsonObject,
+    opts?: IncludeDrillsOpts,
+  ) =>
+    apiRequest<RelatedResource>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/related-resources/rollbar`, opts?.includeDrills),
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
   // Meeting bot sessions
-  listIncidentMeetingBots: (incidentId: string) =>
-    apiRequest<MeetingBotSession[]>(`/v1/incidents/${incidentId}/meeting-bot`),
+  listIncidentMeetingBots: (incidentId: string, opts?: IncludeDrillsOpts) =>
+    apiRequest<MeetingBotSession[]>(
+      withIncludeDrills(`/v1/incidents/${incidentId}/meeting-bot`, opts?.includeDrills),
+    ),
 
   // createIncidentMeetingBot is NOT retried: the server dispatches a bot asynchronously
   // and the dispatch is not idempotent — a retry after a timeout can send a second bot.
-  createIncidentMeetingBot: (incidentId: string, body: JsonObject) =>
+  createIncidentMeetingBot: (incidentId: string, body: JsonObject, opts?: IncludeDrillsOpts) =>
     apiRequest<MeetingBotSession>(
-      `/v1/incidents/${incidentId}/meeting-bot`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/meeting-bot`, opts?.includeDrills),
       { method: 'POST', body: JSON.stringify(body) },
       0,
     ),
 
-  deleteIncidentMeetingBot: (incidentId: string, sessionId: string) =>
+  deleteIncidentMeetingBot: (incidentId: string, sessionId: string, opts?: IncludeDrillsOpts) =>
     apiRequest<MeetingBotSession>(
-      `/v1/incidents/${incidentId}/meeting-bot/${sessionId}`,
+      withIncludeDrills(`/v1/incidents/${incidentId}/meeting-bot/${sessionId}`, opts?.includeDrills),
       { method: 'DELETE' },
     ),
 
@@ -830,6 +1026,7 @@ export interface ExportIncidentsParams {
   serviceId?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+  includeDrills?: boolean;
 }
 
 function buildExportQuery(params: ExportIncidentsParams): URLSearchParams {
@@ -847,6 +1044,7 @@ function buildExportQuery(params: ExportIncidentsParams): URLSearchParams {
   for (const s of params.declareSource ?? []) qs.append('declareSource', s);
   for (const c of params.category ?? []) qs.append('category', c);
   for (const t of params.tag ?? []) qs.append('tag', t);
+  if (params.includeDrills) qs.set('includeDrills', 'true');
   return qs;
 }
 

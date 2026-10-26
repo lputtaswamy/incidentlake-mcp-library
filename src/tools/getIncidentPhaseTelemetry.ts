@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerGetIncidentPhaseTelemetry(server: McpServer) {
   server.registerTool(
@@ -10,11 +11,12 @@ export function registerGetIncidentPhaseTelemetry(server: McpServer) {
         'Get computed response timeline telemetry for an incident: per-phase capture counts, elapsed time between phases, and time-to-first-customer-communication / customer-handling-duration rollups.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
       }),
     },
     async (input) => {
       try {
-        const data = await api.getIncidentPhaseTelemetry(input.incidentId);
+        const data = await api.getIncidentPhaseTelemetry(input.incidentId, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

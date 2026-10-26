@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerCreateIncidentSeverity(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerCreateIncidentSeverity(server: McpServer) {
         'Create a new severity record for an incident (draft or published). Severity 1 is highest, 5 is lowest.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         severity: z
           .number()
           .int()
@@ -34,7 +36,7 @@ export function registerCreateIncidentSeverity(server: McpServer) {
         if (input.isDraft !== undefined) body.isDraft = input.isDraft;
         if (input.reason !== undefined) body.reason = input.reason;
 
-        const data = await api.createIncidentSeverity(input.incidentId, body);
+        const data = await api.createIncidentSeverity(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

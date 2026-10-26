@@ -2,6 +2,16 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
 import { optionalNonEmptyStringArraySchema } from '../coerceArrays';
+import { zIncludeDrills } from '../incidentZod';
+import { INCIDENT_CATEGORIES, type IncidentCategory } from '../types';
+
+type SearchIncidentsInput = {
+  query: string;
+  limit?: number;
+  tags?: string[];
+  category?: IncidentCategory[];
+  includeDrills?: boolean;
+};
 
 export function registerSearchIncidents(server: McpServer) {
   server.registerTool(
@@ -21,11 +31,19 @@ export function registerSearchIncidents(server: McpServer) {
         tags: optionalNonEmptyStringArraySchema.describe(
           'Optional categorization tags AND filter (must match all); array or comma-separated string.',
         ),
-      }),
+        category: z
+          .array(z.enum(INCIDENT_CATEGORIES))
+          .optional()
+          .describe('Category filter (system, security, operational). Match any listed value.'),
+        includeDrills: zIncludeDrills,
+      }) as z.ZodType<SearchIncidentsInput>,
     },
-    async (input) => {
+    async (input: SearchIncidentsInput) => {
       try {
-        const data = await api.searchIncidents(input.query, input.limit, input.tags);
+        const data = await api.searchIncidents(input.query, input.limit, input.tags, {
+          category: input.category,
+          includeDrills: input.includeDrills,
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerDeleteSlackThread(server: McpServer) {
   server.registerTool(
@@ -10,6 +11,7 @@ export function registerDeleteSlackThread(server: McpServer) {
         'Unlink a Slack thread from an incident. Use the thread id from slackThreadUrls on get_incident (or from add_slack_thread). Threads linked automatically by the Slack bot cannot be removed with this tool.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         threadId: z
           .string()
           .uuid()
@@ -18,7 +20,7 @@ export function registerDeleteSlackThread(server: McpServer) {
     },
     async (input) => {
       try {
-        const data = await api.deleteSlackThread(input.incidentId, input.threadId);
+        const data = await api.deleteSlackThread(input.incidentId, input.threadId, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
