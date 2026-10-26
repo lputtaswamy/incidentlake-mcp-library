@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerCompleteSopStep(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerCompleteSopStep(server: McpServer) {
         'Mark an SOP checklist step as complete for an incident. Optionally specify a completion timestamp; defaults to server time.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         stepId: z.string().uuid().describe('The UUID of the SOP step to mark complete'),
         completedAt: z
           .string()
@@ -24,7 +26,7 @@ export function registerCompleteSopStep(server: McpServer) {
         const body: JsonObject = {};
         if (input.completedAt !== undefined) body.completedAt = input.completedAt;
 
-        const data = await api.completeSopStep(input.incidentId, input.stepId, body);
+        const data = await api.completeSopStep(input.incidentId, input.stepId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

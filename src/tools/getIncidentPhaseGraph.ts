@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerGetIncidentPhaseGraph(server: McpServer) {
   server.registerTool(
@@ -10,11 +11,12 @@ export function registerGetIncidentPhaseGraph(server: McpServer) {
         'Get the response timeline (phase graph) that applies to an incident: its nodes (response phases) and edges (sequencing), plus whether the incident has its own custom graph or uses the tenant default. Use this to discover valid nodeId values before recording a capture.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
       }),
     },
     async (input) => {
       try {
-        const data = await api.getIncidentPhaseGraph(input.incidentId);
+        const data = await api.getIncidentPhaseGraph(input.incidentId, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

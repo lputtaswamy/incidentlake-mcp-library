@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerCreateReportDraft(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerCreateReportDraft(server: McpServer) {
         'Create a report draft for an incident. Used to save AI-generated or manual summaries, timelines, or postmortems before publishing.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         draftType: z
           .enum(['summary', 'timeline', 'postmortem'])
           .describe('Section type of the report draft'),
@@ -28,7 +30,7 @@ export function registerCreateReportDraft(server: McpServer) {
         if (input.title !== undefined) body.title = input.title;
         if (input.dataHash !== undefined) body.dataHash = input.dataHash;
 
-        const data = await api.createReportDraft(input.incidentId, body);
+        const data = await api.createReportDraft(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

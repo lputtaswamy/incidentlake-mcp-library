@@ -66,6 +66,10 @@ export function registerExportIncidents(server: McpServer) {
           .optional()
           .describe('Sort field (createdAt, updatedAt, name, status, severity, category, occurredAt).'),
         sortDir: z.enum(['asc', 'desc']).optional().describe('Sort direction. Default: desc.'),
+        includeDrills: z
+          .boolean()
+          .optional()
+          .describe('Include drill (exercise) incidents. Default false.'),
       }),
     },
     async (input) => {

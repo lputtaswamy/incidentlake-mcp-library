@@ -2,7 +2,22 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
 import { optionalNonEmptyStringArraySchema } from '../coerceArrays';
-import { zIncidentStatusListFilter } from '../incidentZod';
+import { zIncidentStatusListFilter, zIncludeDrills } from '../incidentZod';
+import { INCIDENT_CATEGORIES, type IncidentCategory, type IncidentStatus } from '../types';
+
+type ListIncidentsInput = {
+  status?: IncidentStatus;
+  severity?: number;
+  declareSource?: 'api' | 'slack' | 'manual';
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'status' | 'severity' | 'category';
+  sortDir?: 'asc' | 'desc';
+  limit?: number;
+  cursor?: string;
+  q?: string;
+  tags?: string[];
+  category?: IncidentCategory[];
+  includeDrills?: boolean;
+};
 
 const inputSchema = z.object({
   status: zIncidentStatusListFilter.optional().describe(
@@ -20,7 +35,7 @@ const inputSchema = z.object({
     .optional()
     .describe('Filter by how the incident was declared'),
   sortBy: z
-    .enum(['createdAt', 'updatedAt', 'name', 'status', 'severity'])
+    .enum(['createdAt', 'updatedAt', 'name', 'status', 'severity', 'category'])
     .optional()
     .describe('Field to sort results by (default: createdAt)'),
   sortDir: z.enum(['asc', 'desc']).optional().describe('Sort direction (default: desc)'),
@@ -42,7 +57,12 @@ const inputSchema = z.object({
   tags: optionalNonEmptyStringArraySchema.describe(
     'Categorization tags AND filter: incident must include every tag (repeat tag= in API); array or comma-separated string.',
   ),
-});
+  category: z
+    .array(z.enum(INCIDENT_CATEGORIES))
+    .optional()
+    .describe('Category filter (system, security, operational). Match any listed value.'),
+  includeDrills: zIncludeDrills,
+}) as z.ZodType<ListIncidentsInput>;
 
 export function registerListIncidents(server: McpServer) {
   server.registerTool(
@@ -52,7 +72,7 @@ export function registerListIncidents(server: McpServer) {
         'List incidents for the tenant with optional filtering, sorting, and cursor-based pagination. Use this to browse all incidents or narrow down by status, severity, or source.',
       inputSchema,
     },
-    async (input) => {
+    async (input: ListIncidentsInput) => {
       try {
         const params = new URLSearchParams();
         if (input.status) params.set('status', input.status);
@@ -68,6 +88,12 @@ export function registerListIncidents(server: McpServer) {
             params.append('tag', t);
           }
         }
+        if (input.category) {
+          for (const category of input.category) {
+            params.append('category', category);
+          }
+        }
+        if (input.includeDrills) params.set('includeDrills', 'true');
 
         const data = await api.listIncidents(params);
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import { requiredNonEmptyStringArraySchema } from '../coerceArrays';
 
 export function registerAddIncidentTags(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerAddIncidentTags(server: McpServer) {
         'Merge tags into an incident (POST /v1/incidents/{id}/tags). Duplicates ignored; returns full incident.',
       inputSchema: z.object({
         incidentId: z.string().uuid(),
+        includeDrills: zIncludeDrills,
         tags: requiredNonEmptyStringArraySchema.describe(
           'Non-empty tag strings, e.g. client:acme, urgency:high; array or comma-separated string.',
         ),
@@ -18,7 +20,7 @@ export function registerAddIncidentTags(server: McpServer) {
     },
     async (input) => {
       try {
-        const data = await api.addIncidentTags(input.incidentId, input.tags);
+        const data = await api.addIncidentTags(input.incidentId, input.tags, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

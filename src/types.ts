@@ -7,15 +7,33 @@ export type JsonObject = { [key: string]: JsonValue };
  * Incident status values.
  * Accepts exactly this set.
  */
-export const INCIDENT_STATUSES = ['ongoing', 'resolved', 'stalled', 'cancelled'] as const;
+export const INCIDENT_STATUSES = [
+  'ongoing',
+  'resolved',
+  'stalled',
+  'cancelled',
+  'false_positive',
+] as const;
 export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
 
 /**
- * create body — OpenAPI only documents ongoing | resolved.
- * The handler applies other statuses via update after insert only when non-ongoing.
+ * POST /v1/incidents accepts the same status set as PATCH. Omitted status stays ongoing.
  */
-export const CREATE_INCIDENT_STATUSES = ['ongoing', 'resolved'] as const;
-export type IncidentCreateStatus = (typeof CREATE_INCIDENT_STATUSES)[number];
+export const CREATE_INCIDENT_STATUSES = INCIDENT_STATUSES;
+export type IncidentCreateStatus = (typeof INCIDENT_STATUSES)[number];
+
+export const INCIDENT_CATEGORIES = ['system', 'security', 'operational'] as const;
+export type IncidentCategory = (typeof INCIDENT_CATEGORIES)[number];
+
+/** Task activity types accepted by the public task create/update routes. */
+export const INCIDENT_ACTIVITY_TYPES = [
+  'client_communication',
+  'engineering_response',
+  'customer_engineer_investigation',
+  'product_engineer_investigation',
+  'impact_scope_assessment',
+] as const;
+export type IncidentActivityType = (typeof INCIDENT_ACTIVITY_TYPES)[number];
 
 export interface Incident {
   id: string;
@@ -166,6 +184,47 @@ export interface PendingKnowledgeDraft {
 
 /** Approved AI knowledge draft (POST /v1/knowledge/{id}/approve). */
 export type ApprovedKnowledgeDraft = Omit<PendingKnowledgeDraft, 'createdByEmail'>;
+
+/** GitHub issue or pull request hit from GET /v1/integrations/github/issues. */
+export interface GitHubSearchHit {
+  number: number;
+  kind: 'issue' | 'pull';
+  title: string;
+  /** 'open' | 'closed' | 'merged' */
+  state: string;
+  htmlUrl: string;
+  author: string | null;
+  updatedAt: string | null;
+}
+
+/** Providers accepted by POST /v1/integrations/{provider}/verify-connection. */
+export const INTEGRATION_CONNECTION_PROVIDERS = [
+  'notion',
+  'datadog',
+  'grafana',
+  'sentry',
+  'rollbar',
+  'backlog',
+  'statuspage',
+  'jira',
+  'zabbix',
+  'instana',
+  'github',
+  'servicenow',
+  'netbox',
+  'outlook',
+] as const;
+export type IntegrationConnectionProvider = (typeof INTEGRATION_CONNECTION_PROVIDERS)[number];
+
+/** Result of testing a saved integration. A failed credential is still a successful HTTP call. */
+export interface IntegrationConnectionTest {
+  provider: IntegrationConnectionProvider;
+  result: 'ok' | 'unauthorized' | 'forbidden' | 'unreachable' | 'unexpected';
+  httpStatus: number | null;
+  code?: string;
+  detail?: string;
+  message: string;
+}
 
 /** Jira issue hit from GET /v1/integrations/jira/issues. */
 export interface JiraSearchHit {

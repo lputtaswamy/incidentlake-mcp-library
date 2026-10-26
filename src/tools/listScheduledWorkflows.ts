@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerListScheduledWorkflows(server: McpServer) {
   server.registerTool(
@@ -9,11 +10,12 @@ export function registerListScheduledWorkflows(server: McpServer) {
       description: 'List all scheduled workflows for an incident.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
       }),
     },
     async (input) => {
       try {
-        const data = await api.listScheduledWorkflows(input.incidentId);
+        const data = await api.listScheduledWorkflows(input.incidentId, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

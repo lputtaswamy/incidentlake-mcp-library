@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerCreateIncidentPhaseCapture(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerCreateIncidentPhaseCapture(server: McpServer) {
         'Record that a response timeline phase was reached at a given time for an incident (e.g. "customer was notified at 14:32"). Use get_incident_phase_graph first to find a valid nodeId.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         nodeId: z
           .string()
           .uuid()
@@ -31,7 +33,7 @@ export function registerCreateIncidentPhaseCapture(server: McpServer) {
         if (input.capturedAt !== undefined) body.capturedAt = input.capturedAt;
         if (input.note !== undefined) body.note = input.note;
 
-        const data = await api.createIncidentPhaseCapture(input.incidentId, body);
+        const data = await api.createIncidentPhaseCapture(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

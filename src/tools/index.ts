@@ -114,6 +114,8 @@ import { registerLinkRiskToIncident } from './linkRiskToIncident';
 // Integrations
 import { registerListIntegrations } from './listIntegrations';
 import { registerSearchJiraIssues } from './searchJiraIssues';
+import { registerSearchGitHubIssues } from './searchGitHubIssues';
+import { registerVerifyIntegrationConnection } from './verifyIntegrationConnection';
 import { registerSearchNotionPages } from './searchNotionPages';
 import { registerSearchGrafanaResources } from './searchGrafanaResources';
 import { registerSearchSentryIssues } from './searchSentryIssues';
@@ -259,6 +261,8 @@ export function registerTools(server: McpServer, { localFileAccess = true }: Reg
   // Integrations
   registerListIntegrations(server);
   registerSearchJiraIssues(server);
+  registerSearchGitHubIssues(server);
+  registerVerifyIntegrationConnection(server);
   registerSearchNotionPages(server);
   registerSearchGrafanaResources(server);
   registerSearchSentryIssues(server);

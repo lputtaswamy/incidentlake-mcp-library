@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerCreateIncidentPhaseEdge(server: McpServer) {
   server.registerTool(
@@ -10,16 +11,21 @@ export function registerCreateIncidentPhaseEdge(server: McpServer) {
         'Link two phases on an incident\'s response timeline (source → target). If the incident is still using the tenant default timeline, this forks a private copy for the incident first, same as create_incident_phase_node. Both node ids must belong to this same incident\'s (already forked) graph.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         sourceNodeId: z.string().uuid().describe('The phase node UUID the link starts from'),
         targetNodeId: z.string().uuid().describe('The phase node UUID the link points to'),
       }),
     },
     async (input) => {
       try {
-        const data = await api.createIncidentPhaseEdge(input.incidentId, {
-          sourceNodeId: input.sourceNodeId,
-          targetNodeId: input.targetNodeId,
-        });
+        const data = await api.createIncidentPhaseEdge(
+          input.incidentId,
+          {
+            sourceNodeId: input.sourceNodeId,
+            targetNodeId: input.targetNodeId,
+          },
+          { includeDrills: input.includeDrills },
+        );
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

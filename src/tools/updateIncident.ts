@@ -2,15 +2,28 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
 import { optionalNullableEmailArraySchema } from '../coerceArrays';
-import { zIncidentStatusPatch } from '../incidentZod';
+import { zIncidentStatusPatch, zIncludeDrills, zOptionalNullableIncidentCategory } from '../incidentZod';
 import type { IncidentStatus, JsonObject } from '../types';
 
 const inputSchema = z.object({
   incidentId: z.string().uuid().describe('Incident UUID'),
   name: z.string().min(1).max(255).optional().describe('Incident title'),
   status: zIncidentStatusPatch.optional().describe(
-    'Incident status (same set as Public API PATCH: ongoing, resolved, stalled, cancelled)',
+    'Incident status (ongoing, resolved, stalled, cancelled, or false_positive)',
   ),
+  category: zOptionalNullableIncidentCategory,
+  severity: z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .optional()
+    .describe('Publishes a new severity (1=highest, 5=lowest)'),
+  severityReason: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Reason stored on the new severity row. Requires severity in the same request.'),
   summary: z.string().optional().describe('Summary text'),
   timeline: z.string().optional(),
   postmortem: z.string().optional(),
@@ -38,6 +51,7 @@ const inputSchema = z.object({
     .describe(
       'Replaces all RBAC tags on the incident. Pass [] to clear. Call list_rbac_tags first to get valid IDs.',
     ),
+  includeDrills: zIncludeDrills,
 });
 
 /**
@@ -58,6 +72,10 @@ type UpdateIncidentToolInput = {
   permanentResponseCompletedAt?: string | null;
   assigneeEmails?: string[] | null;
   rbacTagIds?: string[];
+  category?: 'system' | 'security' | 'operational' | null;
+  severity?: number;
+  severityReason?: string | null;
+  includeDrills?: boolean;
 };
 
 export function registerUpdateIncident(server: McpServer) {
@@ -65,14 +83,30 @@ export function registerUpdateIncident(server: McpServer) {
     'update_incident',
     {
       description:
-        'Update an incident via Public API (PATCH /v1/incidents/{id}). Send at least one field: name, status, summary, timeline, postmortem; timestamps occurredAt, detectedAt, responseStartedAt, temporaryResponseCompletedAt, permanentResponseCompletedAt (ISO 8601 strings, or null to clear); assigneeEmails (full commander list); rbacTagIds (replaces all RBAC tags, [] to clear — call list_rbac_tags first).',
-      inputSchema,
+        'Update an incident via Public API (PATCH /v1/incidents/{id}). Send at least one field: name, status (including false_positive), category, summary, timeline, postmortem; timestamps (ISO 8601 or null to clear); assigneeEmails; severity with optional severityReason; rbacTagIds. Set includeDrills when the incident is a drill.',
+      inputSchema: inputSchema as z.ZodType<UpdateIncidentToolInput>,
     },
     async (input: UpdateIncidentToolInput) => {
       try {
         const body: JsonObject = {};
         if (input.name !== undefined) body.name = input.name;
         if (input.status !== undefined) body.status = input.status;
+        if (input.category !== undefined) body.category = input.category;
+        if (input.severity !== undefined) body.severity = input.severity;
+        if (input.severityReason !== undefined) {
+          if (input.severity === undefined) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: 'Error: severityReason requires severity.',
+                },
+              ],
+              isError: true,
+            };
+          }
+          body.severityReason = input.severityReason;
+        }
         if (input.summary !== undefined) body.summary = input.summary;
         if (input.timeline !== undefined) body.timeline = input.timeline;
         if (input.postmortem !== undefined) body.postmortem = input.postmortem;
@@ -100,7 +134,9 @@ export function registerUpdateIncident(server: McpServer) {
           };
         }
 
-        const data = await api.updateIncident(input.incidentId, body);
+        const data = await api.updateIncident(input.incidentId, body, {
+          includeDrills: input.includeDrills,
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

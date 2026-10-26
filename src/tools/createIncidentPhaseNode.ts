@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 export function registerCreateIncidentPhaseNode(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerCreateIncidentPhaseNode(server: McpServer) {
         'Add a phase (node) to an incident\'s response timeline. If the incident is still using the tenant default timeline, this forks a private copy for the incident first — call get_incident_phase_graph again afterwards to pick up the forked node/edge ids.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         label: z.string().min(1).describe('Phase name'),
         description: z.string().nullable().optional().describe('Optional phase description'),
         positionX: z.number().optional().describe('Canvas X position (defaults to 0)'),
@@ -26,7 +28,7 @@ export function registerCreateIncidentPhaseNode(server: McpServer) {
         if (input.positionY !== undefined) body.positionY = input.positionY;
         if (input.sortOrder !== undefined) body.sortOrder = input.sortOrder;
 
-        const data = await api.createIncidentPhaseNode(input.incidentId, body);
+        const data = await api.createIncidentPhaseNode(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

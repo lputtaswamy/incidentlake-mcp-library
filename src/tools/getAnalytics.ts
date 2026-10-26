@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerGetAnalytics(server: McpServer) {
   server.registerTool(
@@ -17,11 +18,12 @@ export function registerGetAnalytics(server: McpServer) {
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be in YYYY-MM-DD format')
           .describe('End date in YYYY-MM-DD format (inclusive)'),
+        includeDrills: zIncludeDrills,
       }),
     },
     async (input) => {
       try {
-        const data = await api.getAnalytics(input.startDate, input.endDate);
+        const data = await api.getAnalytics(input.startDate, input.endDate, input.includeDrills);
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

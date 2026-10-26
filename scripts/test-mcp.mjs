@@ -167,7 +167,7 @@ async function main() {
     'delete_knowledge_item', 'update_knowledge_item_tags',
     'list_pending_knowledge_drafts', 'approve_knowledge_draft', 'dismiss_knowledge_draft',
     'get_current_tenant', 'add_related_resource_by_url',
-    'search_jira_issues', 'search_notion_pages',
+    'search_jira_issues', 'search_github_issues', 'verify_integration_connection', 'search_notion_pages',
     'get_incident_phase_graph',
     'create_incident_phase_node', 'update_incident_phase_node', 'delete_incident_phase_node',
     'create_incident_phase_edge', 'delete_incident_phase_edge',

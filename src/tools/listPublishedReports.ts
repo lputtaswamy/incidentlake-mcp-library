@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 
 export function registerListPublishedReports(server: McpServer) {
   server.registerTool(
@@ -10,6 +11,7 @@ export function registerListPublishedReports(server: McpServer) {
         'List published report versions for an incident. Optionally filter by report type: summary, timeline, or postmortem.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         reportType: z
           .enum(['summary', 'timeline', 'postmortem'])
           .optional()
@@ -18,7 +20,7 @@ export function registerListPublishedReports(server: McpServer) {
     },
     async (input) => {
       try {
-        const data = await api.listPublishedReports(input.incidentId, input.reportType);
+        const data = await api.listPublishedReports(input.incidentId, input.reportType, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

@@ -1,16 +1,19 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 type AddIncidentNoteInput = {
   incidentId: string;
+  includeDrills?: boolean;
   content: string;
   createdBy?: string;
 };
 
 const inputSchema = z.object({
   incidentId: z.string().uuid().describe('The UUID of the incident to add the note to'),
+  includeDrills: zIncludeDrills,
   content: z
     .string()
     .min(1)
@@ -39,7 +42,7 @@ export function registerAddIncidentNote(server: McpServer) {
         const body: JsonObject = { content: input.content };
         if (input.createdBy) body.createdBy = input.createdBy;
 
-        const data = await api.addIncidentNote(input.incidentId, body);
+        const data = await api.addIncidentNote(input.incidentId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

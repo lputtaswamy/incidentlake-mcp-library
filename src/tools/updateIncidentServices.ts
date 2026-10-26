@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import { coerceInputToStringArray } from '../coerceArrays';
 
 export function registerUpdateIncidentServices(server: McpServer) {
@@ -11,6 +12,7 @@ export function registerUpdateIncidentServices(server: McpServer) {
         'Replace the full list of services linked to an incident. Pass an empty array to clear all linked services.',
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         serviceIds: z
           .preprocess(coerceInputToStringArray, z.array(z.string().uuid()))
           .describe(
@@ -20,7 +22,7 @@ export function registerUpdateIncidentServices(server: McpServer) {
     },
     async (input) => {
       try {
-        const data = await api.updateIncidentServices(input.incidentId, input.serviceIds as string[]);
+        const data = await api.updateIncidentServices(input.incidentId, input.serviceIds as string[], { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

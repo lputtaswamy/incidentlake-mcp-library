@@ -1,10 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api } from '../client';
+import { zIncludeDrills } from '../incidentZod';
 import type { JsonObject } from '../types';
 
 type Input = {
   incidentId: string;
+  includeDrills?: boolean;
   taskId: string;
   source: 'jira' | 'backlog' | 'servicenow';
   reference: string;
@@ -18,6 +20,7 @@ export function registerLinkIncidentTaskExternalIssue(server: McpServer) {
         "Link an existing external tracker issue (Jira, Backlog, or ServiceNow) to an incident task. The task's status and fields may be updated to match the linked issue. Reference can be the full URL or an identifier such as a Jira issue key (KAN-1) or a ServiceNow record number (INC0010001).",
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
+        includeDrills: zIncludeDrills,
         taskId: z.string().uuid().describe('The UUID of the task'),
         source: z
           .enum(['jira', 'backlog', 'servicenow'])
@@ -31,7 +34,7 @@ export function registerLinkIncidentTaskExternalIssue(server: McpServer) {
     async (input: Input) => {
       try {
         const body: JsonObject = { source: input.source, reference: input.reference };
-        const data = await api.linkIncidentTaskExternalIssue(input.incidentId, input.taskId, body);
+        const data = await api.linkIncidentTaskExternalIssue(input.incidentId, input.taskId, body, { includeDrills: input.includeDrills });
         return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error occurred';
