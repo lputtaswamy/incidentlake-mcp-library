@@ -143,6 +143,31 @@ import { registerListIncidentPhaseCaptures } from './listIncidentPhaseCaptures';
 import { registerCreateIncidentPhaseCapture } from './createIncidentPhaseCapture';
 import { registerDeleteIncidentPhaseCapture } from './deleteIncidentPhaseCapture';
 import { registerGetIncidentPhaseTelemetry } from './getIncidentPhaseTelemetry';
+// Drills
+import { registerListDrillIndustries } from './listDrillIndustries';
+import { registerListDrillCatalog } from './listDrillCatalog';
+import { registerListDrillScenarios } from './listDrillScenarios';
+import { registerCreateDrillScenario } from './createDrillScenario';
+import { registerCreateDrillScenarioFromCatalog } from './createDrillScenarioFromCatalog';
+import { registerGetDrillScenario } from './getDrillScenario';
+import { registerUpdateDrillScenario } from './updateDrillScenario';
+import { registerDeleteDrillScenario } from './deleteDrillScenario';
+import { registerListDrillSessions } from './listDrillSessions';
+import { registerCreateDrillSession } from './createDrillSession';
+import { registerGetDrillSession } from './getDrillSession';
+import { registerUpdateDrillSession } from './updateDrillSession';
+import { registerStartDrillSession } from './startDrillSession';
+import { registerPauseDrillSession } from './pauseDrillSession';
+import { registerResumeDrillSession } from './resumeDrillSession';
+import { registerCompleteDrillSession } from './completeDrillSession';
+import { registerListDrillDecisions } from './listDrillDecisions';
+import { registerCreateDrillDecision } from './createDrillDecision';
+import { registerDeliverDrillInject } from './deliverDrillInject';
+import { registerInjectDrillWildcard } from './injectDrillWildcard';
+import { registerGenerateDrillDebrief } from './generateDrillDebrief';
+import { registerGetDrillDebrief } from './getDrillDebrief';
+import { registerAcceptDrillImprovement } from './acceptDrillImprovement';
+import { registerDismissDrillImprovement } from './dismissDrillImprovement';
 
 export interface RegisterToolsOptions {
   /**
@@ -290,6 +315,31 @@ export function registerTools(server: McpServer, { localFileAccess = true }: Reg
   registerCreateIncidentPhaseCapture(server);
   registerDeleteIncidentPhaseCapture(server);
   registerGetIncidentPhaseTelemetry(server);
+  // Drills
+  registerListDrillIndustries(server);
+  registerListDrillCatalog(server);
+  registerListDrillScenarios(server);
+  registerCreateDrillScenario(server);
+  registerCreateDrillScenarioFromCatalog(server);
+  registerGetDrillScenario(server);
+  registerUpdateDrillScenario(server);
+  registerDeleteDrillScenario(server);
+  registerListDrillSessions(server);
+  registerCreateDrillSession(server);
+  registerGetDrillSession(server);
+  registerUpdateDrillSession(server);
+  registerStartDrillSession(server);
+  registerPauseDrillSession(server);
+  registerResumeDrillSession(server);
+  registerCompleteDrillSession(server);
+  registerListDrillDecisions(server);
+  registerCreateDrillDecision(server);
+  registerDeliverDrillInject(server);
+  registerInjectDrillWildcard(server);
+  registerGenerateDrillDebrief(server);
+  registerGetDrillDebrief(server);
+  registerAcceptDrillImprovement(server);
+  registerDismissDrillImprovement(server);
   // Knowledge
   registerListKnowledgeItems(server);
   registerSearchKnowledgeItems(server);
