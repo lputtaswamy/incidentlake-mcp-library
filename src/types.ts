@@ -664,6 +664,207 @@ export interface PhaseEdgeTelemetry {
   elapsedMs: number | null;
 }
 
+/** Industries a drill scenario can target. Matches Public API scenario content. */
+export const DRILL_INDUSTRIES = ['generic', 'finance', 'it', 'gov', 'healthcare'] as const;
+export type DrillIndustry = (typeof DRILL_INDUSTRIES)[number];
+
+export const DRILL_HAZARDS = [
+  'earthquake',
+  'flood',
+  'power_outage',
+  'network_outage',
+  'cyber',
+  'pandemic',
+  'compound',
+  'other',
+] as const;
+export type DrillHazard = (typeof DRILL_HAZARDS)[number];
+
+export const DRILL_EXERCISE_TYPES = ['tabletop', 'functional', 'full_scale'] as const;
+export type DrillExerciseType = (typeof DRILL_EXERCISE_TYPES)[number];
+
+export const DRILL_SCENARIO_STATUSES = ['draft', 'approved', 'archived'] as const;
+export type DrillScenarioStatus = (typeof DRILL_SCENARIO_STATUSES)[number];
+
+export const DRILL_SESSION_STATES = ['scheduled', 'running', 'paused', 'completed'] as const;
+export type DrillSessionState = (typeof DRILL_SESSION_STATES)[number];
+
+/** Default on create is `suggest`. */
+export const DRILL_FACILITATOR_MODES = ['suggest', 'auto', 'off'] as const;
+export type DrillFacilitatorMode = (typeof DRILL_FACILITATOR_MODES)[number];
+
+export const DRILL_PARTICIPANT_KINDS = ['player', 'controller', 'observer'] as const;
+export type DrillParticipantKind = (typeof DRILL_PARTICIPANT_KINDS)[number];
+
+export const DRILL_DECISION_SOURCES = ['participant', 'controller'] as const;
+export type DrillDecisionSource = (typeof DRILL_DECISION_SOURCES)[number];
+
+/** Default on create is `ja`. */
+export const DRILL_CONTENT_LANGUAGES = ['ja', 'en'] as const;
+export type DrillContentLanguage = (typeof DRILL_CONTENT_LANGUAGES)[number];
+
+export const DRILL_INJECT_METHODS = [
+  'phone',
+  'fax',
+  'email',
+  'radio',
+  'in_person',
+  'system',
+  'other',
+] as const;
+export type DrillInjectMethod = (typeof DRILL_INJECT_METHODS)[number];
+
+export const DRILL_CONDITION_KINDS = [
+  'natural_disaster',
+  'cyber_attack',
+  'infrastructure_outage',
+  'pandemic',
+] as const;
+export type DrillConditionKind = (typeof DRILL_CONDITION_KINDS)[number];
+
+export interface DrillLocalizedText {
+  ja: string;
+  en: string;
+}
+
+/** Industry profile from GET /v1/drills/industries. */
+export interface DrillIndustryProfile {
+  id: DrillIndustry;
+  label: DrillLocalizedText;
+  businessTypes: JsonValue[];
+  regulations: JsonValue[];
+  requiredRoles: JsonValue[];
+  defaultKpis: JsonValue[];
+}
+
+/** Catalog entry from GET /v1/drills/catalog. Copy it with create_drill_scenario_from_catalog. */
+export interface DrillCatalogEntry {
+  key: string;
+  industry: DrillIndustry;
+  businessTypes: string[];
+  hazard: DrillHazard;
+  exerciseType: DrillExerciseType;
+  durationMinutes: number;
+  title: DrillLocalizedText;
+  summary: DrillLocalizedText;
+}
+
+/** Saved drill scenario. List responses may set `sealed` and omit the answer key. */
+export interface DrillScenario {
+  id: string;
+  tenantId: string;
+  industry: DrillIndustry;
+  businessType: string | null;
+  title: string;
+  hazard: DrillHazard;
+  exerciseType: DrillExerciseType;
+  durationMinutes: number;
+  setting: JsonObject;
+  conditions: JsonObject;
+  priorityServices: JsonValue[];
+  injects: JsonValue[];
+  wildcards: JsonValue[];
+  source: string;
+  catalogKey: string | null;
+  sourceFile: JsonObject | null;
+  generatedBy: JsonObject | null;
+  targetRecordId: string | null;
+  status: DrillScenarioStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sealed?: boolean;
+}
+
+export interface DrillSchedule {
+  briefingAt: string | null;
+  startAt: string;
+  debriefAt: string | null;
+  followUpDueAt: string | null;
+}
+
+/**
+ * Drill session. Until the drill ends, participants who are not controllers get no cards
+ * and no scenarioId. `viewerRole` says which view this is.
+ */
+export interface DrillSession {
+  id: string;
+  tenantId: string;
+  scenarioId: string | null;
+  scenario: JsonObject;
+  incidentId: string | null;
+  schedule: DrillSchedule;
+  scheduleAssessment: JsonValue[] | null;
+  state: DrillSessionState;
+  facilitatorMode: DrillFacilitatorMode;
+  startedAt: string | null;
+  pausedAt: string | null;
+  completedAt: string | null;
+  pausedTotalMs: number;
+  pauseIntervals: JsonValue[];
+  phaseNodeMap: JsonObject;
+  drillElapsedMinutes: number;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  viewerRole?: 'controller' | 'participant';
+  totalInjects?: number;
+  participants?: JsonValue[];
+  injects?: JsonValue[];
+  phases?: JsonValue[];
+  sop?: JsonObject;
+}
+
+export interface DrillDecision {
+  id: string;
+  tenantMemberId: string | null;
+  memberName: string | null;
+  role: string | null;
+  source: DrillDecisionSource;
+  decision: string;
+  checks: JsonValue[] | null;
+  injectSeq: number | null;
+  decidedAt: string;
+  drillMinutes: number;
+  evaluation: JsonObject | null;
+  facilitatorAction: JsonValue | null;
+  noteId: string | null;
+}
+
+export interface DrillDecisionResult {
+  decision: DrillDecision;
+  facilitatorAction: JsonValue | null;
+  delivered: JsonObject | null;
+}
+
+export interface DrillImprovementItem {
+  id: string;
+  sessionId: string;
+  kind: 'knowledge' | 'risk';
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  detail: string | null;
+  regulationRef: JsonObject | null;
+  status: 'pending' | 'accepted' | 'dismissed';
+  knowledgeItemId: string | null;
+  riskId: string | null;
+  decidedAt: string | null;
+}
+
+/** Debrief of a finished drill. GET returns null when none has been generated yet. */
+export interface DrillDebrief {
+  sessionId: string;
+  generatedAt: string;
+  generatedBy: JsonObject | null;
+  summary: string;
+  deadlineMisses: JsonValue[];
+  nextScenarioRecommendations: JsonValue[];
+  kpiResults: JsonValue[];
+  reportDraftId: string | null;
+  reportMarkdown: string;
+  improvements: DrillImprovementItem[];
+}
+
 /** Computed response timeline telemetry for an incident. */
 export interface IncidentPhaseTelemetry {
   incidentId: string;

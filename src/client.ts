@@ -57,6 +57,14 @@ import type {
   RecordedGraphVersion,
   CmdbGraphVersionHistoryResult,
   CmdbGraphVersionDetail,
+  DrillCatalogEntry,
+  DrillDebrief,
+  DrillDecision,
+  DrillDecisionResult,
+  DrillImprovementItem,
+  DrillIndustryProfile,
+  DrillScenario,
+  DrillSession,
 } from './types';
 
 function unwrapDataPayload<T>(json: JsonValue): T {
@@ -75,6 +83,8 @@ function unwrapDataPayload<T>(json: JsonValue): T {
 const REQUEST_TIMEOUT_MS = 30000;
 // Approval translates the draft and writes embeddings before responding.
 const APPROVE_KNOWLEDGE_DRAFT_TIMEOUT_MS = 120_000;
+// Recording a decision can call the facilitator model; generating a debrief always does.
+const DRILL_LLM_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 
@@ -1016,6 +1026,135 @@ export const api = {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
     return apiRequest<RollbarItem[]>(`/v1/integrations/rollbar/search${qs}`);
   },
+
+  // Drills (BCP / incident exercises). Inserts and state changes are not retried: a timeout
+  // after the server has committed would insert a second row, or retry into a 409.
+  listDrillIndustries: () => apiRequest<DrillIndustryProfile[]>('/v1/drills/industries'),
+
+  listDrillCatalog: (params?: URLSearchParams) =>
+    apiRequest<DrillCatalogEntry[]>(
+      `/v1/drills/catalog${params && params.size ? `?${params.toString()}` : ''}`,
+    ),
+
+  listDrillScenarios: (params?: URLSearchParams) =>
+    apiRequest<DrillScenario[]>(
+      `/v1/drills/scenarios${params && params.size ? `?${params.toString()}` : ''}`,
+    ),
+
+  createDrillScenario: (body: JsonObject) =>
+    apiRequest<DrillScenario>('/v1/drills/scenarios', { method: 'POST', body: JSON.stringify(body) }, 0),
+
+  createDrillScenarioFromCatalog: (body: JsonObject) =>
+    apiRequest<DrillScenario>(
+      '/v1/drills/scenarios/from-catalog',
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+    ),
+
+  getDrillScenario: (scenarioId: string) =>
+    apiRequest<DrillScenario>(`/v1/drills/scenarios/${scenarioId}`),
+
+  updateDrillScenario: (scenarioId: string, body: JsonObject) =>
+    apiRequest<DrillScenario>(`/v1/drills/scenarios/${scenarioId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteDrillScenario: (scenarioId: string) =>
+    apiRequest<{ success: boolean }>(`/v1/drills/scenarios/${scenarioId}`, { method: 'DELETE' }),
+
+  listDrillSessions: () => apiRequest<DrillSession[]>('/v1/drills/sessions'),
+
+  createDrillSession: (body: JsonObject) =>
+    apiRequest<DrillSession>('/v1/drills/sessions', { method: 'POST', body: JSON.stringify(body) }, 0),
+
+  getDrillSession: (sessionId: string) =>
+    apiRequest<DrillSession>(`/v1/drills/sessions/${sessionId}`),
+
+  updateDrillSession: (sessionId: string, body: JsonObject) =>
+    apiRequest<DrillSession>(`/v1/drills/sessions/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  startDrillSession: (sessionId: string) =>
+    apiRequest<DrillSession>(
+      `/v1/drills/sessions/${sessionId}/start`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  pauseDrillSession: (sessionId: string) =>
+    apiRequest<DrillSession>(
+      `/v1/drills/sessions/${sessionId}/pause`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  resumeDrillSession: (sessionId: string) =>
+    apiRequest<DrillSession>(
+      `/v1/drills/sessions/${sessionId}/resume`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  completeDrillSession: (sessionId: string) =>
+    apiRequest<DrillSession>(
+      `/v1/drills/sessions/${sessionId}/complete`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  listDrillDecisions: (sessionId: string) =>
+    apiRequest<DrillDecision[]>(`/v1/drills/sessions/${sessionId}/decisions`),
+
+  createDrillDecision: (sessionId: string, body: JsonObject) =>
+    apiRequest<DrillDecisionResult>(
+      `/v1/drills/sessions/${sessionId}/decisions`,
+      { method: 'POST', body: JSON.stringify(body) },
+      0,
+      DRILL_LLM_TIMEOUT_MS,
+    ),
+
+  deliverDrillInject: (sessionId: string, seq: number) =>
+    apiRequest<JsonObject>(
+      `/v1/drills/sessions/${sessionId}/injects/${seq}/deliver`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  injectDrillWildcard: (sessionId: string, index: number) =>
+    apiRequest<JsonObject>(
+      `/v1/drills/sessions/${sessionId}/wildcards/${index}/inject`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  // Regenerating replaces pending improvements, so a retry after a timeout would run it twice.
+  generateDrillDebrief: (sessionId: string) =>
+    apiRequest<DrillDebrief>(
+      `/v1/drills/sessions/${sessionId}/debrief`,
+      { method: 'POST', body: '{}' },
+      0,
+      DRILL_LLM_TIMEOUT_MS,
+    ),
+
+  getDrillDebrief: (sessionId: string) =>
+    apiRequest<DrillDebrief | null>(`/v1/drills/sessions/${sessionId}/debrief`),
+
+  acceptDrillImprovement: (improvementId: string) =>
+    apiRequest<DrillImprovementItem>(
+      `/v1/drills/improvements/${improvementId}/accept`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
+
+  dismissDrillImprovement: (improvementId: string) =>
+    apiRequest<DrillImprovementItem>(
+      `/v1/drills/improvements/${improvementId}/dismiss`,
+      { method: 'POST', body: '{}' },
+      0,
+    ),
 };
 
 // ---------------------------------------------------------------------------
