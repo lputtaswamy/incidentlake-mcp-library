@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { McpServer } from "@modelcontextprotocol/server";
+import { requireApprovalForDangerousTools } from './approval';
 import { registerTools, type RegisterToolsOptions } from './tools/index';
 import { registerResources } from './resources/index';
 import { runWithCredentials, type Credentials } from './credentials';
@@ -15,6 +16,7 @@ export function createIncidentLakeMcpServer(options: RegisterToolsOptions = {}):
     version: '0.7.0',
   });
 
+  requireApprovalForDangerousTools(server);
   registerTools(server, { toolsets: parseToolsets(process.env.SIGQ_TOOLSETS), ...options });
   registerResources(server);
 

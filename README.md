@@ -20,15 +20,20 @@ The core tools stay registered no matter what: incidents, notes, tags, checklist
 
 | Group | Default | Adds |
 | --- | --- | --- |
-| `incidents` | yes | ITIL fields, AI field fill, severity detection, checklist templates, roles, task reports, linked changes, the emergency chat room |
+| `incidents` | yes | Custom fields, analytics dashboards, the incident query language, the self-service portal, ITIL fields, AI field fill, severity detection, checklist templates, roles, task reports, linked changes, the emergency chat room |
 | `task_board` | yes | Task board projects, tasks, scopes, comments and files |
+| `service_requests` | | Service request catalog, submissions, approvals and fulfilment |
 | `problems` | | Problem candidates, risk history and links, improvement tasks |
-| `knowledge` | | Semantic search, versions, CSV import, classification, and the evidence library |
-| `changes` | | Changes, releases, deployments, GitHub sync |
-| `specs` | | Specification spaces, pages, reviews, change requests, sources, judgements |
+| `knowledge` | | Portal publication, semantic search, versions, CSV import, classification, and the evidence library |
+| `changes` | | GitHub repository access, changes, releases, deployments, GitHub sync |
+| `specs` | | Traceability, acceptance criteria, spaces, pages, reviews, change requests, sources, judgements |
 | `emergency` | | Emergency plans, contacts, activations, consultations |
-| `services` | | Service incident counts, ITIL attributes, dependency extraction, NetBox, the service catalog, locations and business operations |
-| `settings` | | Workflow automations and tenant configuration (templates, roles, severity criteria, RBAC, ITIL settings) |
+| `services` | | IT assets, Jamf Pro, service incident counts, ITIL attributes, dependency extraction, NetBox, the service catalog, locations and business operations |
+| `settings` | | Custom field definitions, workflow automations and tenant configuration (templates, roles, severity criteria, RBAC, ITIL settings) |
+
+## Approval for destructive operations
+
+Tools that delete or change existing data ask you to approve each call before anything is changed. The name starts with `delete_`, `remove_`, `update_`, `replace_`, `upsert_`, `resolve_`, `reopen_`, `publish_`, `cancel_`, `dismiss_`, `approve_`, `unlink_`, `uncomplete_`, `sync_`, `save_`, `set_`, `link_`, `close_`, `reject_`, `fulfill_`, `escalate_`, `import_` or `confirm_` (a `bulk_` prefix is allowed). Clients that support MCP form elicitation show an approval dialog with the tool's arguments; a client that still advertises `elicitation: {}` counts. The call runs only if you tick **Approve** and accept. On the current protocol, which has no server-to-client request, the same question comes back as an input-required result and the tool runs when you approve the retry. These tools are also marked `destructiveHint: true`, so clients without form elicitation (and the stateless remote HTTP server) fall back to the client's own tool-call confirmation. A declined, unticked or timed-out approval changes nothing, and the model is told not to retry on its own.
 
 Nothing is required. With `SIGQ_TOOLSETS` unset, the two default groups are added on top of the core tools. `all` adds every group, `none` keeps only the core tools, and `default,specs` adds one more group.
 

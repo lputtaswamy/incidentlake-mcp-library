@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiToolDefinition } from './defineApiTool';
+import { AI_TIMEOUT_MS } from './defineApiTool';
 
 const ruleId = z.string().uuid().describe('Workflow automation rule UUID');
 const slackId = z.string().regex(/^[A-Z0-9]{1,50}$/i);
@@ -99,5 +100,17 @@ export const workflowTools: ApiToolDefinition[] = [
     method: 'GET',
     path: '/v1/workflow-automation-runs',
     input: { ruleId: ruleId.optional().describe('Only runs of this rule') },
+  },
+  {
+    name: 'preview_workflow_ai_condition',
+    description:
+      'Judge an AI condition against incidents without running any action. Admin only. incidentIds is optional, at most 10; the default is the 5 most recent incidents. Returns per incident matched (null when the check failed) and reason. Consumes AI credits.',
+    method: 'POST',
+    path: '/v1/workflow-automations/ai-condition-preview',
+    timeoutMs: AI_TIMEOUT_MS,
+    input: {
+      condition: z.string().min(1).max(500).describe('Natural-language condition'),
+      incidentIds: z.array(z.string().uuid()).max(10).optional().describe('Incidents to judge. Default: the 5 most recent'),
+    },
   },
 ];

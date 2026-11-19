@@ -109,4 +109,21 @@ export const knowledgeTools: ApiToolDefinition[] = [
       autoRetrieval: z.boolean().describe('true lets chat AI use the item'),
     },
   },
+  {
+    name: 'get_knowledge_portal_publication',
+    description: 'Whether a knowledge item is published to the self-service portal.',
+    method: 'GET',
+    path: '/v1/knowledge/{knowledgeId}/portal-publication',
+    input: { knowledgeId },
+  },
+  {
+    name: 'set_knowledge_portal_publication',
+    description: 'Publish a knowledge item to the self-service portal, or take it down.',
+    method: 'PUT',
+    path: '/v1/knowledge/{knowledgeId}/portal-publication',
+    input: {
+      knowledgeId,
+      published: z.boolean().describe('true publishes the item, false takes it down'),
+    },
+  },
 ];

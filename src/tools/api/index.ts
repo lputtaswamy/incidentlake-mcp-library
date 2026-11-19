@@ -14,17 +14,24 @@ import { knowledgeTools } from './knowledge';
 import { specificationTools } from './specifications';
 import { taskBoardTools } from './taskBoard';
 import { workflowTools } from './workflow';
+import { incidentCustomFieldTools, customFieldDefinitionTools } from './customFields';
+import { itAssetTools } from './itAssets';
+import { analyticsDashboardTools } from './analyticsDashboards';
+import { portalTools } from './portal';
+import { serviceRequestTools } from './serviceRequests';
+import { specTraceTools } from './specTrace';
 
 export const TOOLSET_TOOLS: Record<Toolset, ApiToolDefinition[]> = {
-  incidents: [...incidentResponseTools, ...incidentChatTools],
+  incidents: [...incidentResponseTools, ...incidentChatTools, ...incidentCustomFieldTools, ...analyticsDashboardTools, ...portalTools],
   task_board: taskBoardTools,
+  service_requests: serviceRequestTools,
   problems: improvementTools,
   knowledge: [...knowledgeTools, ...evidenceTools],
   changes: changeTools,
-  specs: specificationTools,
+  specs: [...specificationTools, ...specTraceTools],
   emergency: emergencyTools,
-  services: [...cmdbTools, ...businessContinuityTools],
-  settings: [...adminTools, ...workflowTools],
+  services: [...cmdbTools, ...businessContinuityTools, ...itAssetTools],
+  settings: [...adminTools, ...workflowTools, ...customFieldDefinitionTools],
 };
 
 export function registerApiTools(

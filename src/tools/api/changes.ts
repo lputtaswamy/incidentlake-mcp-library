@@ -204,4 +204,14 @@ export const changeTools: ApiToolDefinition[] = [
     method: 'GET',
     path: '/v1/change-settings/github-repositories',
   },
+  {
+    name: 'check_change_github_repository_access',
+    description:
+      'Check whether the connected GitHub token can read one repository. Answers only for the exact owner/name given; it does not list the repositories the token can read. Use list_change_github_repositories for that.',
+    method: 'GET',
+    path: '/v1/change-settings/github-repository-access',
+    input: {
+      repo: z.string().min(1).describe('Repository as owner/name'),
+    },
+  },
 ];
