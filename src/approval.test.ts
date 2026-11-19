@@ -10,7 +10,14 @@ import {
   type ServerContext,
 } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { isDangerousTool, needsApproval, requireApprovalForDangerousTools, supportsFormElicitation } from './approval';
+import {
+  approvalKey,
+  isDangerousTool,
+  needsApproval,
+  requireApprovalForDangerousTools,
+  supportsFormElicitation,
+} from './approval';
+import { registerTools } from './tools/index';
 
 type Handler = (
   input: Record<string, unknown>,
@@ -199,11 +206,96 @@ describe('requireApprovalForDangerousTools', () => {
       { incidentId: 'x' },
       context({
         inputResponses: {
-          approve_destructive_tool: { action: 'accept', content: { approve: true } },
+          [approvalKey('delete_incident', { incidentId: 'x' })]: { action: 'accept', content: { approve: true } },
         },
       }),
     );
     assert.equal(textOf(retried), 'ran');
+  });
+
+  it('asks again when an approval is replayed for other arguments or another tool', async () => {
+    const pushUnsupported = async () => {
+      throw new SdkError(SdkErrorCode.MethodNotSupportedByProtocolVersion, 'use inputRequired');
+    };
+    const approvedForA = {
+      [approvalKey('delete_incident', { incidentId: 'a' })]: { action: 'accept', content: { approve: true } },
+    };
+    const ran: string[] = [];
+
+    const incidents = install({ elicitation: { form: {} } });
+    incidents.server.registerTool('delete_incident', {}, async () => {
+      ran.push('delete_incident');
+      return { content: [{ type: 'text', text: 'ran' }] };
+    });
+    const otherArguments = await call(incidents.captured)(
+      { incidentId: 'b' },
+      context({ inputResponses: approvedForA, elicitInput: pushUnsupported }),
+    );
+    assert.equal('resultType' in otherArguments && otherArguments.resultType, 'input_required');
+
+    const services = install({ elicitation: { form: {} } });
+    services.server.registerTool('delete_service', {}, async () => {
+      ran.push('delete_service');
+      return { content: [{ type: 'text', text: 'ran' }] };
+    });
+    const otherTool = await call(services.captured)(
+      { incidentId: 'a' },
+      context({ inputResponses: approvedForA, elicitInput: pushUnsupported }),
+    );
+    assert.equal('resultType' in otherTool && otherTool.resultType, 'input_required');
+    assert.deepEqual(ran, []);
+
+    const sameCall = await call(incidents.captured)(
+      { incidentId: 'a' },
+      context({ inputResponses: approvedForA, elicitInput: pushUnsupported }),
+    );
+    assert.equal(textOf(sameCall), 'ran');
+  });
+});
+
+describe('approvalKey', () => {
+  it('is the same for equal arguments in any key order, and differs otherwise', () => {
+    assert.equal(approvalKey('update_incident', { a: 1, b: { c: 2, d: 3 } }), approvalKey('update_incident', { b: { d: 3, c: 2 }, a: 1 }));
+    assert.notEqual(approvalKey('update_incident', { a: 1 }), approvalKey('update_incident', { a: 2 }));
+    assert.notEqual(approvalKey('update_incident', { a: 1 }), approvalKey('update_service', { a: 1 }));
+    assert.notEqual(approvalKey('update_incident', { ids: ['a', 'b'] }), approvalKey('update_incident', { ids: ['b', 'a'] }));
+  });
+});
+
+describe('registered tools', () => {
+  it('gates the state changes whose names the list does not cover', () => {
+    const gated = new Set<string>();
+    const all = new Set<string>();
+    const server = {
+      registerTool(name: string, config: { annotations?: { destructiveHint?: boolean } }) {
+        all.add(name);
+        if (config.annotations?.destructiveHint === true) gated.add(name);
+        return {};
+      },
+      server: { getClientCapabilities: () => undefined },
+    };
+    requireApprovalForDangerousTools(server as unknown as McpServer);
+    registerTools(server as unknown as McpServer, { toolsets: new Set() });
+
+    for (const name of [
+      'complete_sop_step',
+      'start_drill_session',
+      'pause_drill_session',
+      'resume_drill_session',
+      'complete_drill_session',
+      'deliver_drill_inject',
+      'inject_drill_wildcard',
+      'generate_drill_debrief',
+      'accept_drill_improvement',
+      'delete_incident',
+      'update_incident',
+    ]) {
+      assert.equal(gated.has(name), true, name);
+    }
+    for (const name of ['get_incident', 'list_incidents', 'create_incident', 'add_incident_note', 'create_drill_session', 'get_drill_session']) {
+      assert.equal(all.has(name), true, name);
+      assert.equal(gated.has(name), false, name);
+    }
   });
 });
 

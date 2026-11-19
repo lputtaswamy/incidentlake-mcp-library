@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   SdkError,
   SdkErrorCode,
@@ -24,7 +25,6 @@ const DANGEROUS_TOOL_PATTERN =
   /^(bulk_)?(delete|remove|update|replace|upsert|resolve|reopen|publish|cancel|dismiss|approve|unlink|uncomplete|sync|save|set|link|close|reject|fulfill|escalate|import|confirm)_/;
 
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
-const APPROVAL_KEY = 'approve_destructive_tool';
 const CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
 const SECRET_KEY_PATTERN = /secret|token|password|api_?key/i;
 
@@ -128,10 +128,30 @@ function approvalMessage(name: string, input: unknown): string {
   return `Approve running "${name}"? This deletes or changes data in Incident Lake.\n\nArguments:\n${argumentsText(input)}`;
 }
 
+/** JSON with object keys in a fixed order, so equal arguments always give the same text. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (typeof value !== 'object' || value === null) return JSON.stringify(value) ?? 'null';
+  const entries = Object.entries(value)
+    .filter(([, item]) => item !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(',')}}`;
+}
+
+/**
+ * The input-request key for one exact call. An answer comes back under the key it was asked
+ * with, so approving one call says nothing about another tool or other arguments: that call
+ * has a different key, finds no answer, and asks again.
+ */
+export function approvalKey(name: string, input: unknown): string {
+  const digest = createHash('sha256').update(`${name}\n${stableJson(input ?? {})}`).digest('hex');
+  return `approve_${digest.slice(0, 32)}`;
+}
+
 function askOnRetry(name: string, input: unknown): InputRequiredResult {
   return inputRequired({
     inputRequests: {
-      [APPROVAL_KEY]: inputRequired.elicit({
+      [approvalKey(name, input)]: inputRequired.elicit({
         message: approvalMessage(name, input),
         requestedSchema: approvalSchema,
       }),
@@ -147,7 +167,8 @@ function askOnRetry(name: string, input: unknown): InputRequiredResult {
  *
  * Clients on the 2025 protocol get one elicitation dialog (`elicitation: {}` counts as form
  * support). Clients on the 2026 protocol, which has no server-to-client request, get the
- * same question as an input-required result and the tool runs on the retry.
+ * same question as an input-required result and the tool runs on the retry. That answer
+ * only counts for the tool and arguments it was asked about.
  */
 export function requireApprovalForDangerousTools(server: McpServer): void {
   const registerTool = server.registerTool.bind(server) as unknown as (
@@ -183,9 +204,10 @@ async function requestApproval(
 ): Promise<ToolResult | undefined> {
   if (!supportsFormElicitation(clientCapabilities(server, ctx))) return undefined;
 
-  const prior = inputResponse(ctx.mcpReq.inputResponses, APPROVAL_KEY);
+  const key = approvalKey(name, input);
+  const prior = inputResponse(ctx.mcpReq.inputResponses, key);
   if (prior.kind === 'elicit') {
-    const content = acceptedContent(ctx.mcpReq.inputResponses, APPROVAL_KEY, approvalSchema);
+    const content = acceptedContent(ctx.mcpReq.inputResponses, key, approvalSchema);
     return prior.action === 'accept' && content?.approve === true ? undefined : declined(name);
   }
 

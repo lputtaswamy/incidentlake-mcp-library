@@ -8,6 +8,7 @@ export function registerGenerateDrillDebrief(server: McpServer) {
     {
       description:
         'Generate the AI debrief of a finished drill and propose improvements. Uses LLM quota. The session must be completed. Regenerating replaces pending improvement items; accepted and dismissed items stay.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the completed drill session'),
       }),

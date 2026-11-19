@@ -7,6 +7,7 @@ export function registerResumeDrillSession(server: McpServer) {
     'resume_drill_session',
     {
       description: 'Resume a paused drill session. Controllers only.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the drill session'),
       }),
