@@ -8,6 +8,7 @@ export function registerStartDrillSession(server: McpServer) {
     {
       description:
         'Start a scheduled drill session. Controllers only. Starting begins the drill clock and hands out the cards that are due.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the drill session'),
       }),

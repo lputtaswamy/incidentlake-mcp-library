@@ -8,6 +8,7 @@ export function registerCompleteDrillSession(server: McpServer) {
     {
       description:
         'Complete a drill session. Controllers only. Completing reveals the answer key and opens the debrief.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the drill session'),
       }),

@@ -8,6 +8,7 @@ export function registerAcceptDrillImprovement(server: McpServer) {
     {
       description:
         'Accept a proposed drill improvement. A risk candidate becomes a risk. A knowledge draft is not approved here; approve it from the knowledge review queue.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         improvementId: z.string().uuid().describe('The UUID of the improvement item'),
       }),

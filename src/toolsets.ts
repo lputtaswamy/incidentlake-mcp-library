@@ -10,16 +10,21 @@
  */
 export const TOOLSETS = {
   incidents:
-    'More on incidents: ITIL fields and closure, AI field provenance and autofill, severity detection, checklist templates, commanders and roles, task reports and approvals, linked changes and risks, RBAC tags, NetBox hardware, emergency chat rooms',
+    'Custom fields, analytics dashboards and the incident query language, the self-service portal, ITIL fields and closure, AI field provenance and autofill, severity detection, checklist templates, commanders and roles, task reports and approvals, linked changes and risks, RBAC tags, NetBox hardware, emergency chat rooms',
   task_board: 'Task board: projects, tasks, scopes (milestones), comments, files and the work overview',
+  service_requests:
+    'Service requests: catalog items, submissions, approvals, fulfilment tasks and comments',
   problems: 'Problem management: problem candidates, risk history and links, improvement tasks and corrective actions',
-  knowledge: 'Knowledge: semantic search, versions, CSV import, classification, review settings, and the evidence library',
-  changes: 'Change management: changes, releases, deployments and GitHub sync',
-  specs: 'Specifications: spaces, pages, drafts and reviews, threads, versions, change requests, sources and AI judgements',
+  knowledge:
+    'Portal publication, semantic search, versions, CSV import, classification, review settings, and the evidence library',
+  changes: 'GitHub repository access, changes, releases, deployments and GitHub sync',
+  specs:
+    'Traceability and acceptance criteria, spaces, pages, drafts and reviews, threads, versions, change requests, sources and AI judgements',
   emergency: 'Emergency (BCP) response: plans, contacts, activations and AI consultations',
-  services: 'More on CMDB services: incident counts, tags, ITIL attributes, dependency extraction, NetBox devices, the service catalog, locations, business operations and BCP scenarios',
+  services:
+    'IT assets and Jamf Pro, service incident counts, tags, ITIL attributes, dependency extraction, NetBox devices, the service catalog, locations, business operations and BCP scenarios',
   settings:
-    'Tenant configuration (admin): workflow automations, checklist and action item templates, incident roles and routing, severity criteria, RBAC rules, ITIL settings, task pings and checkpoints',
+    'Custom field definitions, workflow automations, checklist and action item templates, incident roles and routing, severity criteria, RBAC rules, ITIL settings, task pings and checkpoints',
 } as const;
 
 export type Toolset = keyof typeof TOOLSETS;

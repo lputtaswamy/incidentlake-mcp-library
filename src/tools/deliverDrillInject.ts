@@ -8,6 +8,7 @@ export function registerDeliverDrillInject(server: McpServer) {
     {
       description:
         'Hand out a scheduled drill card ahead of its time. Controllers only. Fails if the card was already delivered or the drill is not running.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the drill session'),
         seq: z.number().int().describe('Inject seq from the scenario'),

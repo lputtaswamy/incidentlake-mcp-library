@@ -8,6 +8,7 @@ export function registerInjectDrillWildcard(server: McpServer) {
     {
       description:
         'Play an unexpected turn (wildcard) from the scenario. Controllers only. index is the wildcard position in the scenario, starting at 0. Fails if it was already played or the drill is not running.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         sessionId: z.string().uuid().describe('The UUID of the drill session'),
         index: z.number().int().min(0).describe('Zero-based index into the scenario wildcards'),

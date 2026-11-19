@@ -10,6 +10,7 @@ export function registerCompleteSopStep(server: McpServer) {
     {
       description:
         'Mark an SOP checklist step as complete for an incident. Optionally specify a completion timestamp; defaults to server time.',
+      annotations: { destructiveHint: true },
       inputSchema: z.object({
         incidentId: z.string().uuid().describe('The UUID of the incident'),
         includeDrills: zIncludeDrills,
