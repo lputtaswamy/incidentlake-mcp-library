@@ -7,8 +7,8 @@ const spaceId = z.string().uuid().describe('Specification space UUID');
 const targetId = z.string().uuid().describe('UUID of the incident, problem or change');
 const linkId = z.string().uuid().describe('Trace link UUID');
 
-const PROBLEM_RELATIONS = ['as_specified', 'bug', 'spec_gap', 'spec_defect', 'related'] as const;
-const CHANGE_RELATIONS = ['implements', 'related'] as const;
+/** A problem takes the first five, a change takes implements or related. */
+const RELATIONS = ['as_specified', 'bug', 'spec_gap', 'spec_defect', 'related', 'implements'] as const;
 
 /** Traceability and the tenant-wide change-request list. Page and space tools live with the other specification tools. */
 export const specTraceTools: ApiToolDefinition[] = [
@@ -56,8 +56,8 @@ export const specTraceTools: ApiToolDefinition[] = [
       pageId,
       type: z.enum(['problem', 'change']),
       targetId,
-      relation: z.enum([...PROBLEM_RELATIONS, ...CHANGE_RELATIONS]),
-      note: z.string().max(2000).nullable().optional(),
+      relation: z.enum(RELATIONS),
+      note: z.string().max(5000).nullable().optional(),
     },
   },
   {

@@ -14,10 +14,11 @@ import {
 import { z } from 'zod';
 
 /**
- * Tools that delete or change existing data. Create/add/list/get/search stay out.
+ * Names of tools that delete or change existing data. Create/add/list/get/search stay out.
  * `set_`, `link_`, `close_`, `reject_`, `import_` and the rest are the same kind of change;
  * the original prefix list did not name them, so calls such as close_incident and
- * link_incident_task_external_issue ran with no approval.
+ * link_incident_task_external_issue ran with no approval. A tool whose name says nothing
+ * (merge_, move_, restore_...) is gated by declaring `destructiveHint: true` instead.
  */
 const DANGEROUS_TOOL_PATTERN =
   /^(bulk_)?(delete|remove|update|replace|upsert|resolve|reopen|publish|cancel|dismiss|approve|unlink|uncomplete|sync|save|set|link|close|reject|fulfill|escalate|import|confirm)_/;
@@ -25,6 +26,7 @@ const DANGEROUS_TOOL_PATTERN =
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 const APPROVAL_KEY = 'approve_destructive_tool';
 const CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
+const SECRET_KEY_PATTERN = /secret|token|password|api_?key/i;
 
 const approvalSchema = z.object({
   approve: z.boolean().describe('Approve running this tool with the arguments shown'),
@@ -46,10 +48,16 @@ const APPROVAL_JSON_SCHEMA = {
 type RegisterTool = McpServer['registerTool'];
 type ToolConfig = { annotations?: ToolAnnotations; [key: string]: unknown };
 type ToolResult = CallToolResult | InputRequiredResult;
-type ToolHandler = (input: Record<string, unknown>, ctx: ServerContext) => ToolResult | Promise<ToolResult>;
+/** `(input, ctx)`, or `(ctx)` alone when the tool has no inputSchema. */
+type ToolHandler = (...args: unknown[]) => ToolResult | Promise<ToolResult>;
 
 export function isDangerousTool(name: string): boolean {
   return DANGEROUS_TOOL_PATTERN.test(name);
+}
+
+/** Gated by name, or because the tool itself declares that it changes existing data. */
+export function needsApproval(name: string, annotations?: ToolAnnotations): boolean {
+  return isDangerousTool(name) || annotations?.destructiveHint === true;
 }
 
 /**
@@ -99,8 +107,20 @@ function approved(content: unknown): boolean {
   );
 }
 
+/** The dialog shows what will change, not credentials: a client may log what it displays. */
+function withoutSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutSecrets);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      SECRET_KEY_PATTERN.test(key) && typeof item === 'string' && item !== '' ? '(hidden)' : withoutSecrets(item),
+    ]),
+  );
+}
+
 function argumentsText(input: unknown): string {
-  const text = JSON.stringify(input ?? {}, null, 2);
+  const text = JSON.stringify(withoutSecrets(input ?? {}), null, 2);
   return text.length > 4000 ? `${text.slice(0, 3999)}…` : text;
 }
 
@@ -120,10 +140,10 @@ function askOnRetry(name: string, input: unknown): InputRequiredResult {
 }
 
 /**
- * Delete/update-style tools registered after this call ask the user to approve each call
- * before touching any data, and are annotated with `destructiveHint` so clients prompt
- * themselves. Clients without form elicitation, including the stateless HTTP transport,
- * rely on that client-side prompt.
+ * Tools registered after this call that change existing data (by name, or by declaring
+ * `destructiveHint: true`) ask the user to approve each call before touching any data, and
+ * are annotated with `destructiveHint` so clients prompt themselves. Clients without form
+ * elicitation, including the stateless HTTP transport, rely on that client-side prompt.
  *
  * Clients on the 2025 protocol get one elicitation dialog (`elicitation: {}` counts as form
  * support). Clients on the 2026 protocol, which has no server-to-client request, get the
@@ -137,16 +157,19 @@ export function requireApprovalForDangerousTools(server: McpServer): void {
   ) => ReturnType<RegisterTool>;
 
   server.registerTool = ((name: string, config: ToolConfig, cb: ToolHandler) => {
-    if (!isDangerousTool(name)) return registerTool(name, config, cb);
+    if (!needsApproval(name, config.annotations)) return registerTool(name, config, cb);
     return registerTool(
       name,
       {
         ...config,
         annotations: { ...config.annotations, readOnlyHint: false, destructiveHint: true },
       },
-      async (input, ctx) => {
+      async (...args) => {
+        // The context is always last; a tool without inputSchema gets nothing before it.
+        const ctx = args[args.length - 1] as ServerContext;
+        const input = args.length > 1 ? args[0] : {};
         const gate = await requestApproval(server, name, input, ctx);
-        return gate ?? cb(input, ctx);
+        return gate ?? cb(...args);
       },
     );
   }) as RegisterTool;

@@ -3,7 +3,8 @@ import type { ApiToolDefinition } from './defineApiTool';
 
 const requestId = z.string().uuid().describe('Portal request UUID');
 const knowledgeId = z.string().uuid().describe('Knowledge item UUID');
-const cursor = z.string().optional().describe('Page cursor from the previous response');
+const cursor = z.string().optional().describe('nextCursor of the previous page. null there means the last page');
+const commentBody = z.string().min(1).max(10000);
 
 const DESK_STATUSES = ['new', 'in_progress', 'awaiting_requester', 'resolved', 'closed', 'cancelled'] as const;
 const URGENCY = ['high', 'medium', 'low'] as const;
@@ -46,7 +47,7 @@ export const portalTools: ApiToolDefinition[] = [
       urgency: z.enum(URGENCY).optional(),
       serviceId: z.string().uuid().nullable().optional().describe('CMDB service UUID. null clears it'),
       incidentId: z.string().uuid().nullable().optional().describe('Linked incident the caller can read. null clears it'),
-      resolution: z.string().nullable().optional().describe('Resolution shown to the requester. null clears it'),
+      resolution: z.string().max(10000).nullable().optional().describe('Resolution shown to the requester. null clears it'),
     },
   },
   {
@@ -56,7 +57,7 @@ export const portalTools: ApiToolDefinition[] = [
     path: '/v1/portal-requests/{requestId}/comments',
     input: {
       requestId,
-      body: z.string().min(1).describe('Comment text'),
+      body: commentBody.describe('Comment text'),
       internal: z.boolean().optional().describe('true = internal note, hidden from the requester'),
     },
   },
@@ -95,7 +96,7 @@ export const portalTools: ApiToolDefinition[] = [
     description: "The caller's own portal requests, newest first.",
     method: 'GET',
     path: '/v1/portal/requests',
-    input: { cursor: z.string().optional().describe('The last number of the previous page') },
+    input: { cursor },
   },
   {
     name: 'create_portal_request',
@@ -105,8 +106,8 @@ export const portalTools: ApiToolDefinition[] = [
     path: '/v1/portal/requests',
     input: {
       kind: z.enum(['incident', 'question']).describe('incident = something is broken, question = a question'),
-      title: z.string().min(1).max(500).describe('Request title'),
-      description: z.string().max(20000).optional(),
+      title: z.string().min(1).max(255).describe('Request title'),
+      description: z.string().max(10000).optional(),
       serviceId: z.string().uuid().optional().describe('CMDB service UUID'),
       urgency: z.enum(URGENCY).optional().describe('Default medium'),
     },
@@ -125,7 +126,7 @@ export const portalTools: ApiToolDefinition[] = [
     path: '/v1/portal/requests/{requestId}/comments',
     input: {
       requestId,
-      body: z.string().min(1).describe('Reply text'),
+      body: commentBody.describe('Reply text'),
     },
   },
   {
@@ -155,7 +156,7 @@ export const portalTools: ApiToolDefinition[] = [
     path: '/v1/portal/requests/{requestId}/reopen',
     input: {
       requestId,
-      body: z.string().min(1).describe('Why it is being reopened'),
+      body: commentBody.describe('Why it is being reopened'),
     },
   },
 ];

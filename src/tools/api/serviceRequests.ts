@@ -8,13 +8,18 @@ const taskId = z.string().uuid().describe('Fulfilment task UUID');
 const FORM_TYPES = ['text', 'textarea', 'number', 'date', 'select', 'checkbox'] as const;
 const SCOPES = ['mine', 'approvals', 'assigned', 'all'] as const;
 const STATUSES = ['open', 'pending_approval', 'in_progress', 'fulfilled', 'rejected', 'cancelled'] as const;
+const comment = z.string().max(10000);
 
 const formField = z.object({
-  key: z.string().min(1).max(50).describe('Answer key, unique on the item'),
+  key: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]*$/)
+    .max(50)
+    .describe('Answer key, unique on the item: starts with a-z, then a-z, 0-9 or _'),
   label: z.string().min(1).max(200),
   type: z.enum(FORM_TYPES),
   required: z.boolean().optional(),
-  options: z.array(z.string().min(1).max(200)).optional().describe('Choices for select'),
+  options: z.array(z.string().min(1).max(200)).max(50).optional().describe('Choices for select; needed there, and unique'),
   helpText: z.string().max(500).optional(),
 });
 
@@ -28,10 +33,10 @@ const catalogItem = {
   description: z.string().max(5000).optional(),
   category: z.string().max(100).optional(),
   serviceId: z.string().uuid().nullable().optional().describe('CMDB service UUID. null clears it'),
-  formFields: z.array(formField).optional().describe('Questions the requester answers'),
+  formFields: z.array(formField).max(30).optional().describe('Questions the requester answers'),
   approvalMode: z.enum(['none', 'any', 'all']).optional().describe('none, any one approver, or all approvers'),
-  approverIds: z.array(z.string().uuid()).optional().describe('Member UUIDs who approve'),
-  fulfillmentTasks: z.array(fulfillmentTask).optional().describe('Tasks created when the request is approved'),
+  approverIds: z.array(z.string().uuid()).max(10).optional().describe('Member UUIDs who approve. Needed unless approvalMode is none'),
+  fulfillmentTasks: z.array(fulfillmentTask).max(20).optional().describe('Tasks created when the request is approved'),
   defaultAssigneeId: z.string().uuid().nullable().optional().describe('Member who fulfils the request by default. null clears it'),
   targetDays: z.number().int().min(1).max(365).nullable().optional().describe('Target days to fulfil'),
   isActive: z.boolean().optional().describe('Inactive items are hidden from requesters'),
@@ -69,7 +74,8 @@ export const serviceRequestTools: ApiToolDefinition[] = [
   },
   {
     name: 'get_service_request_counts',
-    description: 'Open service request counts per scope: mine, approvals, assigned and all.',
+    description:
+      'Open service request counts: filed by the caller, waiting on the caller to approve, assigned to the caller, and, for the service desk only, all open and unassigned.',
     method: 'GET',
     path: '/v1/service-requests/counts',
   },
@@ -81,10 +87,10 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests',
     input: {
       scope: z.enum(SCOPES).optional(),
-      status: z.enum(['open', ...STATUSES]).optional(),
+      status: z.enum(STATUSES).optional(),
       itemId: itemId.optional(),
-      search: z.string().optional(),
-      limit: z.number().int().min(1).max(200).optional(),
+      search: z.string().max(200).optional(),
+      limit: z.number().int().min(1).max(200).optional().describe('Page size (default 50)'),
       offset: z.number().int().min(0).optional(),
     },
   },
@@ -104,8 +110,8 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     input: {
       itemId,
       title: z.string().max(500).optional(),
-      description: z.string().max(20000).optional(),
-      requestedFor: z.string().max(200).optional().describe('Who the request is for, when it is not the caller'),
+      description: z.string().max(10000).optional(),
+      requestedFor: z.string().max(255).optional().describe('Who the request is for, when it is not the caller'),
       values: z
         .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
         .optional()
@@ -120,7 +126,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     input: {
       requestId,
       assigneeId: z.string().uuid().nullable().optional().describe('Member fulfilling the request. null clears it'),
-      dueAt: z.string().datetime().nullable().optional().describe('Due time, ISO 8601. null clears it'),
+      dueAt: z.string().datetime().nullable().optional().describe('Due time, ISO 8601 in UTC (2026-01-31T09:00:00Z). null clears it'),
     },
   },
   {
@@ -131,7 +137,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests/{requestId}/approve',
     input: {
       requestId,
-      comment: z.string().max(5000).optional(),
+      comment: comment.optional(),
     },
   },
   {
@@ -142,7 +148,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests/{requestId}/reject',
     input: {
       requestId,
-      comment: z.string().min(1).max(5000).describe('Why it is rejected'),
+      comment: comment.min(1).describe('Why it is rejected'),
     },
   },
   {
@@ -153,7 +159,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests/{requestId}/cancel',
     input: {
       requestId,
-      comment: z.string().max(5000).optional(),
+      comment: comment.optional(),
     },
   },
   {
@@ -164,7 +170,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests/{requestId}/fulfill',
     input: {
       requestId,
-      comment: z.string().max(5000).optional(),
+      comment: comment.optional(),
     },
   },
   {
@@ -174,7 +180,7 @@ export const serviceRequestTools: ApiToolDefinition[] = [
     path: '/v1/service-requests/{requestId}/comments',
     input: {
       requestId,
-      comment: z.string().min(1).max(5000),
+      comment: comment.min(1),
     },
   },
   {

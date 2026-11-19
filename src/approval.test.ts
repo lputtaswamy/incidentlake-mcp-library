@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { SdkError, SdkErrorCode, type CallToolResult, type McpServer, type ServerContext } from '@modelcontextprotocol/server';
-import { isDangerousTool, requireApprovalForDangerousTools, supportsFormElicitation } from './approval';
+import {
+  InMemoryTransport,
+  McpServer,
+  SdkError,
+  SdkErrorCode,
+  type CallToolResult,
+  type JSONRPCMessage,
+  type ServerContext,
+} from '@modelcontextprotocol/server';
+import { z } from 'zod';
+import { isDangerousTool, needsApproval, requireApprovalForDangerousTools, supportsFormElicitation } from './approval';
 
 type Handler = (
   input: Record<string, unknown>,
@@ -71,6 +80,15 @@ describe('isDangerousTool', () => {
     for (const name of ['get_incident', 'list_incidents', 'create_incident', 'search_incidents', 'add_incident_note']) {
       assert.equal(isDangerousTool(name), false, name);
     }
+  });
+});
+
+describe('needsApproval', () => {
+  it('also gates a tool that declares destructiveHint under a name the list does not cover', () => {
+    assert.equal(needsApproval('merge_spec_change_request', { destructiveHint: true }), true);
+    assert.equal(needsApproval('merge_spec_change_request', { destructiveHint: false }), false);
+    assert.equal(needsApproval('merge_spec_change_request'), false);
+    assert.equal(needsApproval('delete_incident'), true);
   });
 });
 
@@ -186,5 +204,118 @@ describe('requireApprovalForDangerousTools', () => {
       }),
     );
     assert.equal(textOf(retried), 'ran');
+  });
+});
+
+describe('approval dialog', () => {
+  it('asks for a tool gated by destructiveHint alone', async () => {
+    const { server, captured } = install({ elicitation: { form: {} } });
+    let ran = false;
+    server.registerTool('merge_spec_change_request', { annotations: { destructiveHint: true } }, async () => {
+      ran = true;
+      return { content: [{ type: 'text', text: 'merged' }] };
+    });
+    const result = await call(captured)({}, context({ elicitInput: async () => ({ action: 'decline' }) }));
+    assert.equal(result.isError, true);
+    assert.equal(ran, false);
+  });
+
+  it('shows the arguments without credentials', async () => {
+    const { server, captured } = install({ elicitation: { form: {} } });
+    server.registerTool('update_jamf_settings', {}, async () => ({ content: [{ type: 'text', text: 'saved' }] }));
+    let message = '';
+    await call(captured)(
+      { url: 'https://example.test', clientSecret: 'hunter2', nested: { apiKey: 'k-123', label: 'kept' } },
+      context({
+        elicitInput: async (params: { message: string }) => {
+          message = params.message;
+          return { action: 'accept', content: { approve: true } };
+        },
+      } as unknown as Partial<ServerContext['mcpReq']>),
+    );
+    assert.match(message, /https:\/\/example\.test/);
+    assert.match(message, /kept/);
+    assert.doesNotMatch(message, /hunter2|k-123/);
+  });
+});
+
+/** A 2025-protocol client speaking raw JSON-RPC to a real server, answering every elicitation with `answer`. */
+async function connectClient(capabilities: unknown, answer: unknown) {
+  const server = new McpServer({ name: 'approval-test', version: '0' });
+  requireApprovalForDangerousTools(server);
+  const ran: string[] = [];
+  server.registerTool('delete_thing', { description: 'With input', inputSchema: z.object({ id: z.string() }) }, async ({ id }) => {
+    ran.push(`delete ${id}`);
+    return { content: [{ type: 'text', text: 'deleted' }] };
+  });
+  server.registerTool('sync_everything', { description: 'No inputSchema' }, async () => {
+    ran.push('sync');
+    return { content: [{ type: 'text', text: 'synced' }] };
+  });
+
+  const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  const waiting = new Map<number, (result: unknown) => void>();
+  const asked: string[] = [];
+  let nextId = 0;
+  clientSide.onmessage = (raw: JSONRPCMessage) => {
+    const message = raw as { id?: number; method?: string; params?: { message?: string }; result?: unknown };
+    if (message.method && message.id !== undefined) {
+      asked.push(message.params?.message ?? '');
+      void clientSide.send({ jsonrpc: '2.0', id: message.id, result: answer } as JSONRPCMessage);
+    } else if (message.id !== undefined) {
+      waiting.get(message.id)?.(message.result);
+    }
+  };
+  await clientSide.start();
+  const request = (method: string, params: unknown) =>
+    new Promise<unknown>((resolve) => {
+      nextId += 1;
+      waiting.set(nextId, resolve);
+      void clientSide.send({ jsonrpc: '2.0', id: nextId, method, params } as JSONRPCMessage);
+    });
+  await request('initialize', {
+    protocolVersion: '2025-06-18',
+    capabilities,
+    clientInfo: { name: 'approval-test-client', version: '0' },
+  });
+  await clientSide.send({ jsonrpc: '2.0', method: 'notifications/initialized' } as JSONRPCMessage);
+  const callTool = (name: string, args: Record<string, unknown>) =>
+    request('tools/call', { name, arguments: args }) as Promise<CallToolResult>;
+  return { callTool, asked, ran, close: () => server.close() };
+}
+
+describe('approval over a real connection', () => {
+  const accept = { action: 'accept', content: { approve: true } };
+
+  it('asks once and runs only when approved', async () => {
+    const declining = await connectClient({ elicitation: {} }, { action: 'decline' });
+    const refused = await declining.callTool('delete_thing', { id: 'a' });
+    assert.equal(refused.isError, true);
+    assert.deepEqual(declining.ran, []);
+    assert.equal(declining.asked.length, 1);
+    await declining.close();
+
+    const accepting = await connectClient({ elicitation: { form: {} } }, accept);
+    assert.equal(textOf(await accepting.callTool('delete_thing', { id: 'a' })), 'deleted');
+    assert.deepEqual(accepting.ran, ['delete a']);
+    assert.equal(accepting.asked.length, 1);
+    await accepting.close();
+  });
+
+  it('gates and runs a tool registered without inputSchema', async () => {
+    const declining = await connectClient({ elicitation: { form: {} } }, { action: 'decline' });
+    assert.match(textOf(await declining.callTool('sync_everything', {})), /did not approve/);
+    assert.deepEqual(declining.ran, []);
+    await declining.close();
+
+    const accepting = await connectClient({ elicitation: { form: {} } }, accept);
+    assert.equal(textOf(await accepting.callTool('sync_everything', {})), 'synced');
+    await accepting.close();
+
+    const silent = await connectClient({}, accept);
+    assert.equal(textOf(await silent.callTool('sync_everything', {})), 'synced');
+    assert.equal(silent.asked.length, 0);
+    await silent.close();
   });
 });
